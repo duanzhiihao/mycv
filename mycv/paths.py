@@ -22,3 +22,6 @@ ILSVRC_DIR = Path('/home/duanzh/Projects/Datasets/ILSVRC')
 
 # Global Wheat Head Detection dataset
 GWHD_DIR = Path('/home/duanzh/Projects/Datasets/GWHD')
+
+# UCF-101 dataset
+UCF101_DIR = Path('D:/Datasets/UCF-101')

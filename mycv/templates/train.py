@@ -10,29 +10,13 @@ import torch.cuda.amp as amp
 from torch.utils.tensorboard import SummaryWriter
 import torchvision as tv
 
-from datasets.loadimages import LoadImages
-import models.imcoding.torch_msssim as torch_msssim
-from test_nic import test
-
-
-def increment_dir(name, log_root='runs/'):
-    import re
-    dnames = [s for s in os.listdir(log_root) if s.startswith(name)]
-    if len(dnames) > 0:
-        dnames = [s[len(name):] for s in dnames]
-        ids = [int(re.search(r'\d+', s).group()) for s in dnames]
-        n = max(ids) + 1
-    else:
-        n = 0
-    return pjoin(log_root, f'{name}{n}')
-
+from mycv.utils.general import increment_dir
 
 def train():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--name',       type=str,  default='mini')
-    parser.add_argument('--enc_only',   type=bool, default=True)
-    parser.add_argument('--train_dir',  type=str,  default='D:/Datasets/NIC/train')
-    parser.add_argument('--test_dir',   type=str,  default='D:/Datasets/NIC/test_crop')
+    parser.add_argument('--model',      type=str,  default='')
+    parser.add_argument('--train_dir',  type=str,  default='path')
+    parser.add_argument('--test_dir',   type=str,  default='path')
     parser.add_argument('--resume',     type=str,  default='')
     parser.add_argument('--img_size',   type=int,  default=256)
     parser.add_argument('--batch_size', type=int,  default=64)
@@ -68,7 +52,6 @@ def train():
     model = model.cuda()
 
     # Dataset
-    # dataset = LoadImages(args.train_dir, img_size=args.img_size)
     dataset = tv.datasets.ImageFolder(
         root=args.train_dir,
         transform=tv.transforms.ToTensor()
@@ -82,15 +65,6 @@ def train():
     if args.optimizer == 'Adam':
         optimizer = torch.optim.Adam(model.parameters(), lr=hyp['lr'])
     elif args.optimizer == 'SGD':
-        # pg_w, pg_b, pg_0 = [], [], []  # optimizer parameter groups
-        for k, v in model.named_parameters():
-            assert v.requires_grad == True
-        #     if '.weight' in k and '.bn' not in k:
-        #         pg_w.append(v)  # apply weight decay
-        #     elif '.bias' in k:
-        #         pg_b.append(v)  # biases
-        #     else:
-        #         pg_0.append(v)  # all else
         optimizer = torch.optim.SGD(model.parameters(), lr=hyp['lr'],
                                     momentum=hyp['momentum'], nesterov=hyp['nesterov'])
     else:
@@ -124,7 +98,6 @@ def train():
     last_path = pjoin(log_dir, 'weights/last.pt')
     best_path = pjoin(log_dir, 'weights/best.pt')
     txt_path  = pjoin(log_dir, 'results.txt')
-    best_fitness = best_fitness
 
     # initialize tensorboard
     print(f'Start Tensorboard with "tensorboard --logdir {args.log_root}"',
@@ -137,10 +110,9 @@ def train():
 
     for epoch in range(start_epoch, epochs):
         avg_loss = torch.zeros(4, dtype=torch.float32)
-        # cur_lr = adjust_learning_rate(optimizer, epoch, args.lr)
         cur_lr = optimizer.param_groups[0]['lr']
 
-        pbar_title = ('%-10s' * 6) % ('Epoch', 'GPU_mem', 'lr', 'L_rec', 'L_bpp', 'Loss')
+        pbar_title = ('%-10s' * 4) % ('Epoch', 'GPU_mem', 'lr', 'Loss')
         print('\n' + pbar_title) # title
         pbar = tqdm(enumerate(train_loader), total=len(train_loader))
         for i, (imgs, _) in pbar:

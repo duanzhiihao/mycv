@@ -13,10 +13,10 @@ def load_partial(model, weights):
     if isinstance(weights, str):
         print(f'Loading {type(model).__name__}() weights from {weights}...')
         external_state = torch.load(weights)
-        if 'model' in external_state:
-            external_state = external_state['model']
     else:
         external_state = weights
+    if 'model' in external_state:
+        external_state = external_state['model']
 
     self_state = model.state_dict()
     new_dic = dict()
@@ -85,7 +85,7 @@ class ModelEMA:
     This class is sensitive where it is initialized in the sequence of model init,
     GPU assignment and distributed training wrappers.
     """
-    def __init__(self, model, decay=0.9999, updates=0):
+    def __init__(self, model, decay=0.999, updates=0):
         # Create EMA
         self.ema = deepcopy(model.module if is_parallel(model) else model).eval()  # FP32 EMA
         # if next(model.parameters()).device.type != 'cpu':
