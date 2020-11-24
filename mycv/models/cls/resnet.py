@@ -134,8 +134,32 @@ class ResNet(nn.Module):
         return x
 
 
+def resnet50(num_classes):
+    """ResNet-50 model from
+    `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
+
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+        progress (bool): If True, displays a progress bar of the download to stderr
+    """
+    model = ResNet(Bottleneck, [3, 4, 6, 3], num_classes=num_classes)
+    return model
+
+
+def resnet101(num_classes):
+    """ResNet-101 model from
+    `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
+
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+        progress (bool): If True, displays a progress bar of the download to stderr
+    """
+    model = ResNet(Bottleneck, [3, 4, 23, 3], num_classes=num_classes)
+    return model
+
+
 def resnet152(num_classes):
-    r"""ResNet-152 model from
+    """ResNet-152 model from
     Deep Residual Learning for Image Recognition <https://arxiv.org/pdf/1512.03385.pdf>
 
     Args:

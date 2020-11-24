@@ -18,4 +18,4 @@ def increment_dir(dir_root='runs/', name='exp'):
         n = max(ids) + 1
     else:
         n = 0
-    return dir_root / f'{name}{n}'
+    return dir_root / f'{name}_{n}'

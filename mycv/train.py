@@ -3,6 +3,7 @@ from pathlib import Path
 import argparse
 import yaml
 from tqdm import tqdm
+import random
 import numpy as np
 import torch
 import torch.cuda.amp as amp
@@ -33,21 +34,21 @@ def train():
     parser.add_argument('--optimizer',  type=str,  default='Adam')
     parser.add_argument('--epochs',     type=int,  default=4)
     parser.add_argument('--metric',     type=str,  default='top1')
-    parser.add_argument('--log_root',   type=str,  default='runs/')
+    parser.add_argument('--log_root',   type=str,  default='runs/ilsvrc')
+    parser.add_argument('--device',     nargs='+', default=[0])
     parser.add_argument('--workers',    type=int,  default=8)
     args = parser.parse_args()
     hyp = {
         'lr': 0.0001,
         'momentum': 0.937, # SGD
         'nesterov': True, # SGD
-        'train_fr_step': 10,
-        'val_fr_step': 25,
         'img_hw': (240, 320)
     }
     print(args)
     print(hyp)
-    # random, device, and cuda settings
-    np.random.seed(1); torch.manual_seed(1)
+    # fix random seeds for reproducibility
+    random.seed(1); np.random.seed(1); torch.manual_seed(1)
+    # device setting
     assert torch.cuda.is_available()
     device = torch.device('cuda:0')
     print('Using device', torch.cuda.get_device_properties(device))
@@ -66,18 +67,18 @@ def train():
     )
 
     # Initialize model
-    # from mycv.models.cls.resnet import resnet152
-    # model = resnet152(num_classes=101)
-    model = tv.models.resnet152(num_classes=101)
-    # load pretrained weights
-    from mycv.paths import WEIGHTS_DIR
-    load_partial(model, str(WEIGHTS_DIR / 'resnet152-b121ed2d.pth'))
+    from mycv.models.cls.resnet import resnet50
+    model = resnet50(num_classes=1000)
     model = model.to(device)
     # loss function
     loss_func = torch.nn.CrossEntropyLoss(reduction='mean')
 
     # optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=hyp['lr'])
+    if args.optimizer == 'SGD':
+        raise NotImplementedError()
+        # optimizer = torch.optim.SGD(model.parameters(), lr=hyp['lr'])
+    elif args.optimizer == 'Adam':
+        optimizer = torch.optim.Adam(model.parameters(), lr=hyp['lr'])
     scaler = amp.GradScaler(enabled=args.amp)
 
     if args.resume:
@@ -92,7 +93,7 @@ def train():
         best_fitness = checkpoint.get(metric, 0)
     else:
         # new experiment
-        log_dir = increment_dir(dir_root=args.log_root, name='exp')
+        log_dir = increment_dir(dir_root=args.log_root, name=args.model)
         assert not os.path.exists(log_dir)
         # make dir and save configs
         os.makedirs(log_dir / 'weights')
@@ -105,7 +106,7 @@ def train():
     # Tensorboard
     tb_writer = SummaryWriter(log_dir)
 
-    # ====== start training the model ======
+    # ======================== start training ========================
     for epoch in range(epochs):
         train_loss, train_acc = 0.0, 0.0
         val_acc = 0

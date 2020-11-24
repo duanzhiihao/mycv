@@ -39,33 +39,32 @@ def pad_divisible(im: np.ndarray, div):
     return padded
 
 
-def letterbox(img: np.ndarray, new_shape=(640, 640), color=(114, 114, 114),
-              square=False, scaleup=True) -> Tuple[np.ndarray, float, tuple]:
+def letterbox(img: np.ndarray, tgt_size=640, color=(114,114,114)):
     '''
-    Resize image to a 32-pixel-multiple rectangle
-    https://github.com/ultralytics/yolov3/issues/232
+    Resize and pad the input image to square.
+    1. resize such that the longer side = tgt_size;
+    2. pad to square.
+
+    Args:
+        img:        np.array, (H,W,3), uint8, 0-255
+        tgt_size:   int, the width/height of the output square
+        color:      (int,int,int)    
     '''
-    assert isinstance(img, np.ndarray) and img.dtype == np.uint8
-    shape = img.shape[:2]  # current shape [height, width]
-    if isinstance(new_shape, int):
-        new_shape = (new_shape, new_shape)
+    assert isinstance(img, np.ndarray) and img.dtype == np.uint8 and img.shape[2] == 3
+    old_hw = img.shape[:2]  # current shape [height, width]
 
     # Scale ratio (new / old)
-    r = min(new_shape[0] / shape[0], new_shape[1] / shape[1])
-    if not scaleup:  # only scale down, do not scale up (for better test mAP)
-        r = min(r, 1.0)
-
+    ratio = tgt_size / max(old_hw[0], old_hw[1])
+    # resize
+    new_h = round(old_hw[0] * ratio)
+    new_w = round(old_hw[1] * ratio)
+    if max(new_h, new_w) != tgt_size:
+        img = cv2.resize(img, (new_w,new_h))
     # Compute padding
-    new_unpad = int(round(shape[1] * r)), int(round(shape[0] * r))
-    dw, dh = new_shape[1] - new_unpad[0], new_shape[0] - new_unpad[1]  # wh padding
-    if not square:  # minimum rectangle
-        dw, dh = np.mod(dw, 64), np.mod(dh, 64)  # wh padding
-
-    dw /= 2  # divide padding into 2 sides
-    dh /= 2
-    if shape[::-1] != new_unpad:  # resize
-        img = cv2.resize(img, new_unpad, interpolation=cv2.INTER_LINEAR)
-    top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
-    left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
+    dh, dw = tgt_size - new_h, tgt_size - new_w  # wh padding
+    top, bottom = dh//2, dh - dh//2
+    left, right = dw//2, dw - dw//2
     img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)
-    return img, r, (dw, dh)
+
+    assert img.shape[:2] == (tgt_size, tgt_size)
+    return img, ratio, (top, left)
