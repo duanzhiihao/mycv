@@ -60,7 +60,7 @@ class ImageNetCls(torch.utils.data.Dataset):
             if torch.rand(1).item() > 0.5:
                 im = cv2.flip(im, 1) # horizontal flip
         # resize, pad to square
-        im, ratio, pads = letterbox(im, new_hw=self.img_size)
+        im, ratio, pads = letterbox(im, tgt_size=self.img_size)
         # to tensor
         im = torch.from_numpy(im).permute(2, 0, 1).float() / 255
         assert im.shape[1:] == (self.img_size, self.img_size)

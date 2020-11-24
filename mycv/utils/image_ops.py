@@ -39,7 +39,7 @@ def pad_divisible(im: np.ndarray, div):
     return padded
 
 
-def letterbox(img: np.ndarray, tgt_size=640, color=(114,114,114)):
+def letterbox(img: np.ndarray, tgt_size:int=640, color=(114,114,114)):
     '''
     Resize and pad the input image to square.
     1. resize such that the longer side = tgt_size;
@@ -51,20 +51,25 @@ def letterbox(img: np.ndarray, tgt_size=640, color=(114,114,114)):
         color:      (int,int,int)    
     '''
     assert isinstance(img, np.ndarray) and img.dtype == np.uint8 and img.shape[2] == 3
+    assert isinstance(tgt_size, int)
     old_hw = img.shape[:2]  # current shape [height, width]
 
-    # Scale ratio (new / old)
-    ratio = tgt_size / max(old_hw[0], old_hw[1])
-    # resize
-    new_h = round(old_hw[0] * ratio)
-    new_w = round(old_hw[1] * ratio)
-    if max(new_h, new_w) != tgt_size:
+    # resize if needed
+    if max(old_hw[0], old_hw[1]) != tgt_size:
+        ratio = tgt_size / max(old_hw[0], old_hw[1]) # Scale ratio (new / old)
+        new_h = round(old_hw[0] * ratio)
+        new_w = round(old_hw[1] * ratio)
         img = cv2.resize(img, (new_w,new_h))
-    # Compute padding
-    dh, dw = tgt_size - new_h, tgt_size - new_w  # wh padding
+    else:
+        ratio = 1
+    assert max(img.shape[:2]) == tgt_size
+
+    # pad to square if needed
+    dh, dw = tgt_size - img.shape[0], tgt_size - img.shape[1]  # wh padding
     top, bottom = dh//2, dh - dh//2
     left, right = dw//2, dw - dw//2
-    img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)
+    img = cv2.copyMakeBorder(img, top, bottom, left, right,
+                                borderType=cv2.BORDER_CONSTANT, value=color)
 
     assert img.shape[:2] == (tgt_size, tgt_size)
     return img, ratio, (top, left)

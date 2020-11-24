@@ -42,7 +42,7 @@ def train():
         'lr': 0.0001,
         'momentum': 0.937, # SGD
         'nesterov': True, # SGD
-        'img_hw': (240, 320)
+        'img_size': 256
     }
     print(args)
     print(hyp)
@@ -60,7 +60,8 @@ def train():
 
     # Dataset
     print('Initializing Datasets and Dataloaders...')
-    trainset = None
+    from mycv.datasets.imagenet import ImageNetCls
+    trainset = ImageNetCls(split='train', img_size=hyp['img_size'], augment=True)
     trainloader = torch.utils.data.DataLoader(
         trainset, batch_size=batch_size, shuffle=True, num_workers=args.workers,
         pin_memory=True, drop_last=False
