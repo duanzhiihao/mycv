@@ -32,14 +32,15 @@ def pad_divisible(im: np.ndarray, div):
         the image is divisible by div
     '''
     H_ORG, W_ORG, ch = im.shape
-    H_PAD = int(div * np.ceil(H_ORG / div))
-    W_PAD = int(div * np.ceil(W_ORG / div))
-    padded = np.zeros([H_PAD, W_PAD, ch], dtype=im.dtype)
+    h_pad = round(div * np.ceil(H_ORG / div))
+    w_pad = round(div * np.ceil(W_ORG / div))
+    padded = np.zeros([h_pad, w_pad, ch], dtype=im.dtype)
     padded[:H_ORG, :W_ORG, :] = im
     return padded
 
 
-def letterbox(img: np.ndarray, tgt_size:int=640, color=(114,114,114)):
+def letterbox(img: np.ndarray, tgt_size:int=640, side='longer', to_square=True, div=1,
+              color=(114,114,114)):
     '''
     Resize and pad the input image to square.
     1. resize such that the longer side = tgt_size;
@@ -48,28 +49,30 @@ def letterbox(img: np.ndarray, tgt_size:int=640, color=(114,114,114)):
     Args:
         img:        np.array, (H,W,3), uint8, 0-255
         tgt_size:   int, the width/height of the output square
-        color:      (int,int,int)    
+        color:      (int,int,int)
     '''
     assert isinstance(img, np.ndarray) and img.dtype == np.uint8 and img.shape[2] == 3
-    assert isinstance(tgt_size, int)
+    assert isinstance(tgt_size, int) and (tgt_size % div == 0)
     old_hw = img.shape[:2]  # current shape [height, width]
 
     # resize if needed
-    if max(old_hw[0], old_hw[1]) != tgt_size:
-        ratio = tgt_size / max(old_hw[0], old_hw[1]) # Scale ratio (new / old)
+    _func = min if (side == 'shorter') else max
+    ratio = tgt_size / _func(old_hw[0], old_hw[1]) # Scale ratio (new / old)
+    if ratio != 1:
         new_h = round(old_hw[0] * ratio)
         new_w = round(old_hw[1] * ratio)
         img = cv2.resize(img, (new_w,new_h))
-    else:
-        ratio = 1
-    assert max(img.shape[:2]) == tgt_size
+    assert _func(img.shape[:2]) == tgt_size
 
     # pad to square if needed
-    dh, dw = tgt_size - img.shape[0], tgt_size - img.shape[1]  # wh padding
+    if to_square:
+        dh, dw = tgt_size - img.shape[0], tgt_size - img.shape[1]  # wh padding
+    else:
+        assert dh == tgt_size or dw == tgt_size
+        dh = round(div * np.ceil(img.shape[0] / div))
+        dw = round(div * np.ceil(img.shape[1] / div))
     top, bottom = dh//2, dh - dh//2
     left, right = dw//2, dw - dw//2
     img = cv2.copyMakeBorder(img, top, bottom, left, right,
                                 borderType=cv2.BORDER_CONSTANT, value=color)
-
-    assert img.shape[:2] == (tgt_size, tgt_size)
     return img, ratio, (top, left)

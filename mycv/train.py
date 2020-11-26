@@ -12,6 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from mycv.utils.torch_utils import load_partial
 from mycv.utils.general import increment_dir
+from mycv.datasets.imagenet import ImageNetCls, imagenet_val
 
 
 def cal_acc(p: torch.Tensor, labels: torch.LongTensor):
@@ -32,14 +33,14 @@ def train():
     parser.add_argument('--amp',        type=bool, default=True)
     parser.add_argument('--ema',        type=bool, default=False)
     parser.add_argument('--optimizer',  type=str,  default='Adam')
-    parser.add_argument('--epochs',     type=int,  default=4)
+    parser.add_argument('--epochs',     type=int,  default=90)
     parser.add_argument('--metric',     type=str,  default='top1')
     parser.add_argument('--log_root',   type=str,  default='runs/ilsvrc')
     parser.add_argument('--device',     nargs='+', default=[0])
     parser.add_argument('--workers',    type=int,  default=8)
     args = parser.parse_args()
     hyp = {
-        'lr': 0.0001,
+        'lr': 0.001,
         'momentum': 0.937, # SGD
         'nesterov': True, # SGD
         'img_size': 256
@@ -60,7 +61,7 @@ def train():
 
     # Dataset
     print('Initializing Datasets and Dataloaders...')
-    from mycv.datasets.imagenet import ImageNetCls
+    # training set
     trainset = ImageNetCls(split='train', img_size=hyp['img_size'], augment=True)
     trainloader = torch.utils.data.DataLoader(
         trainset, batch_size=batch_size, shuffle=True, num_workers=args.workers,
@@ -92,6 +93,8 @@ def train():
         scaler.load_state_dict(checkpoint['scaler'])
         start_epoch = checkpoint['epoch'] + 1
         best_fitness = checkpoint.get(metric, 0)
+        yaml.dump(hyp, open(log_dir / f'hyp{start_epoch}.yaml', 'w'), sort_keys=False)
+        yaml.dump(vars(args), open(log_dir/f'args{start_epoch}.yaml','w'), sort_keys=False)
     else:
         # new experiment
         log_dir = increment_dir(dir_root=args.log_root, name=args.model)
@@ -122,10 +125,10 @@ def train():
         for i, (imgs, labels) in pbar:
             niter = epoch * len(trainloader) + i
             # debugging
-            # if True:
-            #     import matplotlib.pyplot as plt
-            #     im = imgs[0].permute(1,2,0).numpy()
-            #     plt.imshow(im); plt.show()
+            if True:
+                import matplotlib.pyplot as plt
+                im = imgs[0].permute(1,2,0).numpy()
+                plt.imshow(im); plt.show()
             imgs = imgs.to(device=device)
             labels = labels.to(device=device)
 
@@ -133,7 +136,7 @@ def train():
             with amp.autocast(enabled=args.amp):
                 p = model(imgs)
                 loss = loss_func(p, labels)
-                loss = loss * batch_size
+                loss = loss * imgs.shape[0]
             # backward, update
             scaler.scale(loss).backward()
             scaler.step(optimizer)
@@ -157,9 +160,8 @@ def train():
                 tb_writer.add_scalar('metric/train_loss', train_loss, global_step=niter)
                 tb_writer.add_scalar('metric/train_acc',  train_acc,  global_step=niter)
                 model.eval()
-                results = test_ucf101_1stframe(
-                    model, split='test', fold=args.fold, img_hw=hyp['img_hw']
-                )
+                results = imagenet_val(model, img_size=hyp['img_size'],
+                            batch_size=4*batch_size, workers=args.workers)
                 val_acc = results['top1']
                 tb_writer.add_scalar('metric/val_acc', val_acc,  global_step=niter)
                 model.train()
@@ -168,9 +170,8 @@ def train():
 
         # Evaluation
         model.eval()
-        results = test_ucf101_1stframe(
-            model, split='test', fold=args.fold, img_hw=hyp['img_hw']
-        )
+        results = imagenet_val(model, img_size=hyp['img_size'],
+                    batch_size=4*batch_size, workers=args.workers)
         tb_writer.add_scalar('metric/val_acc', val_acc,  global_step=niter)
         # Write evaluation results
         res = s + '||' + '%10.4g' * 1 % (results['top1'])
@@ -195,4 +196,12 @@ def train():
 
 
 if __name__ == '__main__':
-    train()
+    # train()
+
+    model = tv.models.resnet152(pretrained=False)
+    weights = torch.load('weights/resnet152-b121ed2d.pth')
+    model.load_state_dict(weights)
+    model = model.cuda()
+    model.eval()
+    results = imagenet_val(model, img_size=224, batch_size=128, workers=8)
+    print(results['top1'])
