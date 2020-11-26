@@ -29,7 +29,7 @@ def train():
     # ====== set the run settings ======
     parser = argparse.ArgumentParser()
     parser.add_argument('--model',      type=str,  default='res50')
-    parser.add_argument('--resume',     type=str,  default='res50_2')
+    parser.add_argument('--resume',     type=str,  default='')
     parser.add_argument('--batch_size', type=int,  default=64)
     parser.add_argument('--amp',        type=bool, default=True)
     parser.add_argument('--ema',        type=bool, default=False)
@@ -182,7 +182,7 @@ def train():
         tb_writer.add_scalar('metric/val_acc', val_acc,  global_step=niter)
         # Write evaluation results
         res = s + '||' + '%10.4g' * 1 % (results['top1'])
-        with open(log_dir / 'results', 'a') as f:
+        with open(log_dir / 'results.txt', 'a') as f:
             f.write(res + '\n')
         # save last checkpoint
         checkpoint = {
