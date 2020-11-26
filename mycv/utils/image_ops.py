@@ -68,9 +68,8 @@ def letterbox(img: np.ndarray, tgt_size:int=640, side='longer', to_square=True, 
     if to_square:
         dh, dw = tgt_size - img.shape[0], tgt_size - img.shape[1]  # wh padding
     else:
-        assert dh == tgt_size or dw == tgt_size
-        dh = round(div * np.ceil(img.shape[0] / div))
-        dw = round(div * np.ceil(img.shape[1] / div))
+        dh = round(div * np.ceil(img.shape[0] / div)) - img.shape[0]
+        dw = round(div * np.ceil(img.shape[1] / div)) - img.shape[1]
     top, bottom = dh//2, dh - dh//2
     left, right = dw//2, dw - dw//2
     img = cv2.copyMakeBorder(img, top, bottom, left, right,

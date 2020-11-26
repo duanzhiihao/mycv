@@ -125,10 +125,10 @@ def train():
         for i, (imgs, labels) in pbar:
             niter = epoch * len(trainloader) + i
             # debugging
-            if True:
-                import matplotlib.pyplot as plt
-                im = imgs[0].permute(1,2,0).numpy()
-                plt.imshow(im); plt.show()
+            # if True:
+            #     import matplotlib.pyplot as plt
+            #     im = imgs[0].permute(1,2,0).numpy()
+            #     plt.imshow(im); plt.show()
             imgs = imgs.to(device=device)
             labels = labels.to(device=device)
 
@@ -203,5 +203,5 @@ if __name__ == '__main__':
     model.load_state_dict(weights)
     model = model.cuda()
     model.eval()
-    results = imagenet_val(model, img_size=224, batch_size=128, workers=8)
+    results = imagenet_val(model, img_size=224, batch_size=1, workers=8)
     print(results['top1'])
