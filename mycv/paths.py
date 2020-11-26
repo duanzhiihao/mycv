@@ -20,6 +20,9 @@ COSSY_DIR = Path('/home/duanzh/Projects/Datasets/COSSY')
 # ImageNet dataset
 ILSVRC_DIR = Path('D:/Datasets/ILSVRC')
 
+# Food-101 dataset
+FOOD101_DIR = Path('D:/Datasets/food-101')
+
 # Global Wheat Head Detection dataset
 GWHD_DIR = Path('/home/duanzh/Projects/Datasets/GWHD')
 

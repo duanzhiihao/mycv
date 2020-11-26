@@ -15,6 +15,7 @@ def get_classes():
     wnids.sort()
     wnid_to_idx = {s:i for i,s in enumerate(wnids)}
     return wnids, wnid_to_idx
+
 WNIDS, WNID_TO_IDX = get_classes()
 RGB_MEAN = (0.485, 0.456, 0.406)
 RGB_STD  = (0.229, 0.224, 0.225)

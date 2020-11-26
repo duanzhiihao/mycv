@@ -12,7 +12,8 @@ from torch.utils.tensorboard import SummaryWriter
 
 from mycv.utils.torch_utils import load_partial
 from mycv.utils.general import increment_dir
-from mycv.datasets.imagenet import ImageNetCls, imagenet_val
+# from mycv.datasets.imagenet import ImageNetCls, imagenet_val
+from mycv.datasets.food101 import Food101, food101_val
 
 
 def cal_acc(p: torch.Tensor, labels: torch.LongTensor):
@@ -62,7 +63,8 @@ def train():
     # Dataset
     print('Initializing Datasets and Dataloaders...')
     # training set
-    trainset = ImageNetCls(split='train', img_size=hyp['img_size'], augment=True)
+    # trainset = ImageNetCls(split='train', img_size=hyp['img_size'], augment=True)
+    trainset = Food101(split='train', img_size=hyp['img_size'], augment=True)
     trainloader = torch.utils.data.DataLoader(
         trainset, batch_size=batch_size, shuffle=True, num_workers=args.workers,
         pin_memory=True, drop_last=False
@@ -160,7 +162,7 @@ def train():
                 tb_writer.add_scalar('metric/train_loss', train_loss, global_step=niter)
                 tb_writer.add_scalar('metric/train_acc',  train_acc,  global_step=niter)
                 model.eval()
-                results = imagenet_val(model, img_size=hyp['img_size'],
+                results = food101_val(model, img_size=hyp['img_size'],
                             batch_size=4*batch_size, workers=args.workers)
                 val_acc = results['top1']
                 tb_writer.add_scalar('metric/val_acc', val_acc,  global_step=niter)
@@ -170,7 +172,7 @@ def train():
 
         # Evaluation
         model.eval()
-        results = imagenet_val(model, img_size=hyp['img_size'],
+        results = food101_val(model, img_size=hyp['img_size'],
                     batch_size=4*batch_size, workers=args.workers)
         tb_writer.add_scalar('metric/val_acc', val_acc,  global_step=niter)
         # Write evaluation results
@@ -198,10 +200,10 @@ def train():
 if __name__ == '__main__':
     # train()
 
-    model = tv.models.resnet152(pretrained=False)
-    weights = torch.load('weights/resnet152-b121ed2d.pth')
-    model.load_state_dict(weights)
+    model = tv.models.resnet152(pretrained=False, num_classes=101)
+    # weights = torch.load('weights/resnet152-b121ed2d.pth')
+    # model.load_state_dict(weights)
     model = model.cuda()
     model.eval()
-    results = imagenet_val(model, img_size=224, batch_size=1, workers=8)
+    results = food101_val(model, img_size=256, batch_size=4, workers=0)
     print(results['top1'])
