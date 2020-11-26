@@ -29,14 +29,14 @@ def train():
     # ====== set the run settings ======
     parser = argparse.ArgumentParser()
     parser.add_argument('--model',      type=str,  default='res50')
-    parser.add_argument('--resume',     type=str,  default='')
+    parser.add_argument('--resume',     type=str,  default='res50_2')
     parser.add_argument('--batch_size', type=int,  default=64)
     parser.add_argument('--amp',        type=bool, default=True)
     parser.add_argument('--ema',        type=bool, default=False)
-    parser.add_argument('--optimizer',  type=str,  default='Adam')
+    parser.add_argument('--optimizer',  type=str,  default='Adam', choices=['Adam', 'SGD'])
     parser.add_argument('--epochs',     type=int,  default=90)
-    parser.add_argument('--metric',     type=str,  default='top1')
-    parser.add_argument('--log_root',   type=str,  default='runs/ilsvrc')
+    parser.add_argument('--metric',     type=str,  default='top1', choices=['top1'])
+    parser.add_argument('--log_root',   type=str,  default='runs/food101')
     parser.add_argument('--device',     nargs='+', default=[0])
     parser.add_argument('--workers',    type=int,  default=8)
     args = parser.parse_args()
@@ -72,7 +72,7 @@ def train():
 
     # Initialize model
     from mycv.models.cls.resnet import resnet50
-    model = resnet50(num_classes=1000)
+    model = resnet50(num_classes=101)
     model = model.to(device)
     # loss function
     loss_func = torch.nn.CrossEntropyLoss(reduction='mean')
@@ -113,9 +113,9 @@ def train():
     tb_writer = SummaryWriter(log_dir)
 
     # ======================== start training ========================
+    val_acc = 0
     for epoch in range(epochs):
         train_loss, train_acc = 0.0, 0.0
-        val_acc = 0
         cur_lr = optimizer.param_groups[0]['lr']
         model.train()
 
@@ -129,8 +129,12 @@ def train():
             # debugging
             # if True:
             #     import matplotlib.pyplot as plt
-            #     im = imgs[0].permute(1,2,0).numpy()
-            #     plt.imshow(im); plt.show()
+            #     from mycv.datasets.food101 import CLASS_NAMES
+            #     for im, lbl in zip(imgs, labels):
+            #         im = im * trainset._input_std + trainset._input_std
+            #         im = im.permute(1,2,0).numpy()
+            #         print(CLASS_NAMES[lbl])
+            #         plt.imshow(im); plt.show()
             imgs = imgs.to(device=device)
             labels = labels.to(device=device)
 
@@ -161,12 +165,12 @@ def train():
             if niter % 200 == 0:
                 tb_writer.add_scalar('metric/train_loss', train_loss, global_step=niter)
                 tb_writer.add_scalar('metric/train_acc',  train_acc,  global_step=niter)
-                model.eval()
-                results = food101_val(model, img_size=hyp['img_size'],
-                            batch_size=4*batch_size, workers=args.workers)
-                val_acc = results['top1']
-                tb_writer.add_scalar('metric/val_acc', val_acc,  global_step=niter)
-                model.train()
+                # model.eval()
+                # results = food101_val(model, img_size=hyp['img_size'],
+                #             batch_size=4*batch_size, workers=args.workers)
+                # val_acc = results['top1']
+                # tb_writer.add_scalar('metric/val_acc', val_acc,  global_step=niter)
+                # model.train()
             # ----Mini batch end
         # ----Epoch end
 
@@ -174,6 +178,7 @@ def train():
         model.eval()
         results = food101_val(model, img_size=hyp['img_size'],
                     batch_size=4*batch_size, workers=args.workers)
+        val_acc = results['top1']
         tb_writer.add_scalar('metric/val_acc', val_acc,  global_step=niter)
         # Write evaluation results
         res = s + '||' + '%10.4g' * 1 % (results['top1'])
@@ -191,19 +196,20 @@ def train():
         # save best checkpoint
         if results[metric] > best_fitness:
             best_fitness = results[metric]
-            torch.save(checkpoint, log_dir / 'weights/last.pt')
+            torch.save(checkpoint, log_dir / 'weights/best.pt')
         del checkpoint
         # ----Epoch end
     # ----Training end
 
 
 if __name__ == '__main__':
-    # train()
+    train()
 
-    model = tv.models.resnet152(pretrained=False, num_classes=101)
-    # weights = torch.load('weights/resnet152-b121ed2d.pth')
-    # model.load_state_dict(weights)
-    model = model.cuda()
-    model.eval()
-    results = food101_val(model, img_size=256, batch_size=4, workers=0)
-    print(results['top1'])
+    # from mycv.models.cls.resnet import resnet50
+    # model = resnet50(num_classes=101)
+    # weights = torch.load('runs/food101/res50_2/weights/last.pt')
+    # model.load_state_dict(weights['model'])
+    # model = model.cuda()
+    # model.eval()
+    # results = food101_val(model, img_size=256, batch_size=4, workers=0)
+    # print(results['top1'])

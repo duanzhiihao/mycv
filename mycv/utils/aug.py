@@ -15,7 +15,7 @@ def rand_aug_cls(im: np.ndarray):
     if torch.rand(1) > 0.5:
         im = cv2.flip(im, 1)
     # color
-    im = augment_hsv(im, hgain=0.1, sgain=0.5, vgain=0.5)
+    im = augment_hsv(im, hgain=0, sgain=0, vgain=0)
     # Additive Gaussian
     # im = im.astype(np.float32)
     # im = im + np.random.randn(im.shape)

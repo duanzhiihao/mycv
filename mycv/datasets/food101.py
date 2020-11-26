@@ -35,7 +35,7 @@ class Food101(torch.utils.data.Dataset):
         json_path = root / 'meta' / f'{split}.json'
         json_data = json.load(open(json_path, 'r'))
 
-        print(f'Loading Food-101 {split} set...')
+        # print(f'Loading Food-101 {split} set...')
         self.img_paths = []
         self.labels = []
         for cname in CLASS_NAMES:
