@@ -64,6 +64,7 @@ class Food101(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         im = cv2.imread(self.img_paths[index])
+        assert im is not None
 
         # resize, pad to square
         im, ratio, pads = letterbox(im, tgt_size=self.img_size)

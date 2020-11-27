@@ -109,14 +109,14 @@ def train():
             yaml.dump(vars(args), open(log_dir/f'args{start_epoch}.yaml','w'), sort_keys=False)
     else:
         # new experiment
-        log_dir = increment_dir(dir_root=args.log_root, name=args.model)
-        assert not os.path.exists(log_dir)
-        # make dir and save configs
-        os.makedirs(log_dir / 'weights')
         if local_rank in [-1, 0]:
+            log_dir = increment_dir(dir_root=args.log_root, name=args.model)
+            assert not os.path.exists(log_dir), log_dir
+            # make dir and save configs
+            os.makedirs(log_dir / 'weights')
             yaml.dump(hyp, open(log_dir / 'hyp.yaml', 'w'), sort_keys=False)
             yaml.dump(vars(args), open(log_dir / 'args.yaml', 'w'), sort_keys=False)
-        print(str(model), file=open(log_dir / 'model.txt', 'w'))
+            print(str(model), file=open(log_dir / 'model.txt', 'w'))
         start_epoch = 0
         best_fitness = 0
 
