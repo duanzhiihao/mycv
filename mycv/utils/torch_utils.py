@@ -1,9 +1,17 @@
 from copy import deepcopy
-
+import random
 import numpy as np
 import torch
 import torch.nn as nn
 import torchvision as tv
+
+
+def set_random_seeds(random_seed=0):
+    torch.manual_seed(random_seed)
+    # torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = True
+    np.random.seed(random_seed)
+    random.seed(random_seed)
 
 
 def load_partial(model, weights):
@@ -27,7 +35,6 @@ def load_partial(model, weights):
     print(f'{type(model).__name__}: {len(self_state)} layers,',
             f'saved: {len(external_state)} layers,',
             f'overlap & loaded: {len(new_dic)} layers')
-    debug = 1
 
 
 def initialize_weights(model):
