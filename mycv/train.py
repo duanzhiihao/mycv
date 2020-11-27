@@ -219,6 +219,8 @@ def train():
                 # logging end
             # ----Mini batch end
         # ----Epoch end
+        # Synchronize model parameters on all gpus
+        model._sync_params_and_buffers(authoritative_rank=0)
 
         # Evaluation
         if local_rank in [-1, 0]:
