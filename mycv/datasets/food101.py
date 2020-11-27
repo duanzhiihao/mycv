@@ -3,7 +3,6 @@ from pathlib import Path
 import json
 from tqdm import tqdm
 
-import numpy as np
 import cv2
 import torch
 
@@ -51,13 +50,13 @@ class Food101(torch.utils.data.Dataset):
         
         # self.sanity_check()
 
-    def sanity_check(self):
-        print('Checking images...')
-        assert len(self.img_paths) == len(self.labels)
-        for i, impath in enumerate(tqdm(self.img_paths)):
-            assert isinstance(impath, str) and os.path.exists(impath), impath
-            cid = self.labels[i]
-            assert isinstance(cid, int) and 0<=cid<101, cid
+    # def sanity_check(self):
+    #     print('Checking images...')
+    #     assert len(self.img_paths) == len(self.labels)
+    #     for i, impath in enumerate(tqdm(self.img_paths)):
+    #         assert isinstance(impath, str) and os.path.exists(impath), impath
+    #         cid = self.labels[i]
+    #         assert isinstance(cid, int) and 0<=cid<101, cid
 
     def __len__(self):
         assert len(self.img_paths) == len(self.labels)
@@ -125,12 +124,20 @@ def food101_val(model, img_size, batch_size, workers):
 
 
 if __name__ == "__main__":
-    dataset = Food101('train')
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=2)
-    imgs, labels = next(iter(dataloader))
+    # dataset = Food101('train')
+    # dataloader = torch.utils.data.DataLoader(dataset, batch_size=2, num_workers=8)
 
-    im = imgs[0] * dataset._input_std + dataset._input_mean
-    im = im.permute(1,2,0).numpy()
-    print(CLASS_NAMES[labels[0].item()])
-    import matplotlib.pyplot as plt
-    plt.imshow(im); plt.show()
+    dataset = Food101(split='train', img_size=256, augment=True)
+    dataloader = torch.utils.data.DataLoader(
+        dataset, batch_size=64, shuffle=True, num_workers=8,
+        pin_memory=True, drop_last=False
+    )
+    for imgs, labels in tqdm(dataloader):
+        pass
+    # imgs, labels = next(iter(dataloader))
+
+    # im = imgs[0] * dataset._input_std + dataset._input_mean
+    # im = im.permute(1,2,0).numpy()
+    # print(CLASS_NAMES[labels[0].item()])
+    # import matplotlib.pyplot as plt
+    # plt.imshow(im); plt.show()

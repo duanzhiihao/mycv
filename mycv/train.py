@@ -4,10 +4,9 @@ import argparse
 import yaml
 from tqdm import tqdm
 import random
-import numpy as np
 import torch
 import torch.cuda.amp as amp
-import torchvision as tv
+import torchvision
 from torch.utils.tensorboard import SummaryWriter
 
 from mycv.utils.torch_utils import load_partial
@@ -28,28 +27,28 @@ def cal_acc(p: torch.Tensor, labels: torch.LongTensor):
 def train():
     # ====== set the run settings ======
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model',      type=str,  default='res50')
+    parser.add_argument('--model',      type=str,  default='res101')
     parser.add_argument('--resume',     type=str,  default='')
     parser.add_argument('--batch_size', type=int,  default=64)
     parser.add_argument('--amp',        type=bool, default=True)
     parser.add_argument('--ema',        type=bool, default=False)
     parser.add_argument('--optimizer',  type=str,  default='Adam', choices=['Adam', 'SGD'])
-    parser.add_argument('--epochs',     type=int,  default=90)
+    parser.add_argument('--epochs',     type=int,  default=100)
     parser.add_argument('--metric',     type=str,  default='top1', choices=['top1'])
     parser.add_argument('--log_root',   type=str,  default='runs/food101')
     parser.add_argument('--device',     nargs='+', default=[0])
     parser.add_argument('--workers',    type=int,  default=8)
     args = parser.parse_args()
     hyp = {
-        'lr': 0.001,
+        'lr': 0.0002,
         'momentum': 0.937, # SGD
         'nesterov': True, # SGD
-        'img_size': 256
+        'img_size': 384
     }
     print(args)
     print(hyp)
     # fix random seeds for reproducibility
-    random.seed(1); np.random.seed(1); torch.manual_seed(1)
+    random.seed(1); torch.manual_seed(1)
     # device setting
     assert torch.cuda.is_available()
     device = torch.device('cuda:0')
@@ -71,8 +70,13 @@ def train():
     )
 
     # Initialize model
-    from mycv.models.cls.resnet import resnet50
-    model = resnet50(num_classes=101)
+    if args.model == 'res50':
+        from mycv.models.cls.resnet import resnet50
+        model = resnet50(num_classes=101)
+    elif args.model == 'res101':
+        from mycv.models.cls.resnet import resnet101
+        model = resnet101(num_classes=101)
+        load_partial(model, 'weights/resnet101-5d3b4d8f.pth')
     model = model.to(device)
     # loss function
     loss_func = torch.nn.CrossEntropyLoss(reduction='mean')
@@ -111,6 +115,8 @@ def train():
 
     # Tensorboard
     tb_writer = SummaryWriter(log_dir)
+    print(f'Start Tensorboard with "tensorboard --logdir {log_dir}",',
+          'view at http://localhost:6006/')
 
     # ======================== start training ========================
     val_acc = 0

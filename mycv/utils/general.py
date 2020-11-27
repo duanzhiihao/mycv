@@ -10,7 +10,8 @@ def increment_dir(dir_root='runs/', name='exp'):
     assert isinstance(dir_root, (str, Path))
     dir_root = Path(dir_root)
     if not os.path.exists(dir_root):
-        print(f'Warning: {dir_root} does not exist.')
+        print(f'Warning: {dir_root} does not exist. Creating it...')
+        os.makedirs(dir_root)
     dnames = [s for s in os.listdir(dir_root) if s.startswith(name)]
     if len(dnames) > 0:
         dnames = [s[len(name):] for s in dnames]
