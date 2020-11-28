@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from time import time
 import argparse
 import yaml
 from tqdm import tqdm
@@ -151,6 +152,7 @@ def train():
 
     # ======================== start training ========================
     val_acc = 0
+    start_time = time()
     for epoch in range(epochs):
         train_loss, train_acc = 0.0, 0.0
         cur_lr = optimizer.param_groups[0]['lr']
@@ -228,7 +230,9 @@ def train():
             results = food101_val(model, img_size=hyp['img_size'],
                         batch_size=4*batch_size, workers=args.workers)
             val_acc = results['top1']
-            tb_writer.add_scalar('metric/val_acc', val_acc,  global_step=niter)
+            tb_writer.add_scalar('metric/val_acc', val_acc, global_step=niter)
+            elapsed_sec = int(time() - start_time)
+            tb_writer.add_scalar('metric/val_acc_sec', val_acc, global_step=elapsed_sec)
             # Write evaluation results
             res = s + '||' + '%10.4g' * 1 % (results['top1'])
             with open(log_dir / 'results.txt', 'a') as f:
