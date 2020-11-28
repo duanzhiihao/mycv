@@ -15,7 +15,11 @@ def coco_evaluate_bbox(dts_json, gt_json, str_print=True):
     cocoEval.accumulate()
     cocoEval.summarize()
     ap, ap50, ap75 = cocoEval.stats[0], cocoEval.stats[1], cocoEval.stats[2]
-    return cocoEval.summary, ap, ap50, ap75
+    results = {
+        'summary': cocoEval.summary,
+        'ap': ap, 'ap50': ap50, 'ap75': ap75
+    }
+    return results
 
 
 class myCOCOeval(cocoeval.COCOeval):

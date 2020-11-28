@@ -9,7 +9,6 @@ def get_img(img_path, out_type='tensor', div=16, color='RGB'):
     Read image
     '''
     im = cv2.imread(img_path)
-    hw_org: tuple = im.shape[0:2]
     if color.upper() == 'RGB':
         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
     else:
@@ -18,12 +17,12 @@ def get_img(img_path, out_type='tensor', div=16, color='RGB'):
     im = im.astype(np.float32) / 255.0
     if out_type == 'array':
         # 0~1, float32, RGB, HWC
-        return im, hw_org
+        return im
     else:
         assert out_type == 'tensor'
-    im = torch.from_numpy(im.transpose(2, 0, 1)) # C,H,W
-    im: torch.Tensor
-    return im, hw_org
+        im = torch.from_numpy(im.transpose(2, 0, 1)) # C,H,W
+        im: torch.Tensor
+        return im
 
 
 def pad_divisible(im: np.ndarray, div):
