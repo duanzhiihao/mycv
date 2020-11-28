@@ -50,6 +50,9 @@ def letterbox(img: np.ndarray, tgt_size:int=640, side='longer', to_square=True, 
         img:        np.array, (H,W,3), uint8, 0-255
         tgt_size:   int, the width/height of the output square
         color:      (int,int,int)
+    
+    Returns:
+        img, ratio, (top, left)
     '''
     assert isinstance(img, np.ndarray) and img.dtype == np.uint8 and img.shape[2] == 3
     assert isinstance(tgt_size, int) and (tgt_size % div == 0)
