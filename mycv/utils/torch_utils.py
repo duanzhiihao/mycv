@@ -1,3 +1,4 @@
+from pathlib import Path
 from copy import deepcopy
 import random
 import numpy as np
@@ -18,7 +19,7 @@ def load_partial(model, weights):
     '''
     Load weights that have the same name
     '''
-    if isinstance(weights, str):
+    if isinstance(weights, (str, Path)):
         print(f'Loading {type(model).__name__}() weights from {weights}...')
         external_state = torch.load(weights)
     else:
