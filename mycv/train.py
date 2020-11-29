@@ -8,11 +8,10 @@ import random
 import torch
 import torch.cuda.amp as amp
 from torch.nn.parallel import DistributedDataParallel as DDP
-import torchvision
-from torch.utils.tensorboard import SummaryWriter
+import wandb
 
+from mycv.utils.timer import now
 from mycv.utils.torch_utils import load_partial, set_random_seeds
-from mycv.utils.general import increment_dir
 # from mycv.datasets.imagenet import ImageNetCls, imagenet_val
 from mycv.datasets.food101 import Food101, food101_val
 
@@ -41,30 +40,32 @@ def train():
     parser.add_argument('--device',     type=int,  default=0)
     parser.add_argument('--workers',    type=int,  default=8)
     parser.add_argument('--local_rank', type=int,  default=-1, help='DDP arg, do not modify')
-    args = parser.parse_args()
-    hyp = {
-        'lr': 0.0002,
-        'momentum': 0.937, # SGD
-        'nesterov': True, # SGD
-        'img_size': 320
-    }
+    cfg = parser.parse_args()
+    cfg.lr = 0.0002
+    cfg.momentum = 0.937
+    cfg.nesterov = True
+    cfg.img_size = 320
+    if cfg.local_rank in [-1, 0]:
+        # initialize wandb
+        wandb.init(project='food101', group=cfg.model, name=now(),
+                   config=cfg)
     # arguments
-    metric:     str = args.metric.lower()
-    epochs:     int = args.epochs
-    local_rank: int = args.local_rank
+    metric:     str = cfg.metric.lower()
+    epochs:     int = cfg.epochs
+    local_rank: int = cfg.local_rank
     world_size: int = int(os.environ.get('WORLD_SIZE', 1))
     assert local_rank == int(os.environ.get('RANK', -1)), 'Currently only support single node'
-    assert args.batch_size % world_size == 0, 'batch_size must be multiple of CUDA device count'
-    batch_size: int = args.batch_size// world_size
+    assert cfg.batch_size % world_size == 0, 'batch_size must be multiple of CUDA device count'
+    batch_size: int = cfg.batch_size// world_size
     if local_rank in [-1, 0]:
-        print(args)
+        print(cfg)
         print(hyp)
     # fix random seeds for reproducibility
     set_random_seeds(1)
     # device setting
     assert torch.cuda.is_available()
     if local_rank == -1: # Single GPU
-        device = torch.device(f'cuda:{args.device}')
+        device = torch.device(f'cuda:{cfg.device}')
     else: # DDP mode
         assert torch.cuda.device_count() > local_rank and torch.distributed.is_available()
         torch.cuda.set_device(local_rank)
@@ -76,10 +77,10 @@ def train():
           torch.cuda.get_device_properties(device))
 
     # Initialize model
-    if args.model == 'res50':
+    if cfg.model == 'res50':
         from mycv.models.cls.resnet import resnet50
         model = resnet50(num_classes=101)
-    elif args.model == 'res101':
+    elif cfg.model == 'res101':
         from mycv.models.cls.resnet import resnet101
         model = resnet101(num_classes=101)
         # load_partial(model, 'weights/resnet101-5d3b4d8f.pth')
@@ -88,16 +89,16 @@ def train():
     loss_func = torch.nn.CrossEntropyLoss(reduction='mean')
 
     # optimizer
-    if args.optimizer == 'SGD':
+    if cfg.optimizer == 'SGD':
         raise NotImplementedError()
         # optimizer = torch.optim.SGD(model.parameters(), lr=hyp['lr'])
-    elif args.optimizer == 'Adam':
+    elif cfg.optimizer == 'Adam':
         optimizer = torch.optim.Adam(model.parameters(), lr=hyp['lr'])
-    scaler = amp.GradScaler(enabled=args.amp)
+    scaler = amp.GradScaler(enabled=cfg.amp)
 
-    if args.resume:
+    if cfg.resume:
         # resume
-        log_dir = Path(args.log_root) / args.resume
+        log_dir = Path(cfg.log_root) / cfg.resume
         assert os.path.isdir(log_dir)
         checkpoint = torch.load(log_dir / 'weights/last.pt')
         model.load_state_dict(checkpoint['model'])
@@ -107,22 +108,22 @@ def train():
         best_fitness = checkpoint.get(metric, 0)
         if local_rank in [-1, 0]:
             yaml.dump(hyp, open(log_dir / f'hyp{start_epoch}.yaml', 'w'), sort_keys=False)
-            yaml.dump(vars(args), open(log_dir/f'args{start_epoch}.yaml','w'), sort_keys=False)
+            yaml.dump(vars(cfg), open(log_dir/f'cfg{start_epoch}.yaml','w'), sort_keys=False)
     else:
         # new experiment
         if local_rank in [-1, 0]:
-            log_dir = increment_dir(dir_root=args.log_root, name=args.model)
+            log_dir = increment_dir(dir_root=cfg.log_root, name=cfg.model)
             assert not os.path.exists(log_dir), log_dir
             # make dir and save configs
             os.makedirs(log_dir / 'weights')
             yaml.dump(hyp, open(log_dir / 'hyp.yaml', 'w'), sort_keys=False)
-            yaml.dump(vars(args), open(log_dir / 'args.yaml', 'w'), sort_keys=False)
+            yaml.dump(vars(cfg), open(log_dir / 'cfg.yaml', 'w'), sort_keys=False)
             print(str(model), file=open(log_dir / 'model.txt', 'w'))
         start_epoch = 0
         best_fitness = 0
 
     # Exponential moving average
-    if args.ema:
+    if cfg.ema:
         raise NotImplementedError()
         # ema = ModelEMA(model) if rank in [-1, 0] else None
 
@@ -141,7 +142,7 @@ def train():
     ) if local_rank != -1 else None
     trainloader = torch.utils.data.DataLoader(
         trainset, batch_size=batch_size, shuffle=(sampler is None), sampler=sampler,
-        num_workers=args.workers, pin_memory=True
+        num_workers=cfg.workers, pin_memory=True
     )
 
     # Tensorboard
@@ -183,7 +184,7 @@ def train():
             labels = labels.to(device=device)
 
             # forward
-            with amp.autocast(enabled=args.amp):
+            with amp.autocast(enabled=cfg.amp):
                 p = model(imgs)
                 loss = loss_func(p, labels) * imgs.shape[0]
                 if local_rank != -1:
@@ -214,7 +215,7 @@ def train():
                     tb_writer.add_scalar('metric/train_acc',  train_acc,  global_step=niter)
                     # model.eval()
                     # results = food101_val(model, img_size=hyp['img_size'],
-                    #             batch_size=4*batch_size, workers=args.workers)
+                    #             batch_size=4*batch_size, workers=cfg.workers)
                     # val_acc = results['top1']
                     # tb_writer.add_scalar('metric/val_acc', val_acc,  global_step=niter)
                     # model.train()
@@ -229,7 +230,7 @@ def train():
         if local_rank in [-1, 0]:
             model.eval()
             results = food101_val(model, img_size=hyp['img_size'],
-                        batch_size=4*batch_size, workers=args.workers)
+                        batch_size=4*batch_size, workers=cfg.workers)
             val_acc = results['top1']
             tb_writer.add_scalar('metric/val_acc', val_acc, global_step=niter)
             elapsed_sec = int(time() - start_time)
