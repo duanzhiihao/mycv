@@ -11,8 +11,17 @@ class contexttimer:
         self.time_str = datetime.timedelta(seconds=round(self.seconds))
 
 
-def now():
-    return datetime.datetime.now().strftime('%b/%d/%Y, %H:%M:%S')
+def now(file_name=True):
+    '''
+    Args:
+        file_name:
+            True: 2020Nov29-22h36m07s
+            False: Nov/29/2020, 22:33:52
+    '''
+    if file_name:        
+        return datetime.datetime.now().strftime('%Y%b%d-%Hh%Mm%Ss')
+    else:
+        return datetime.datetime.now().strftime('%b/%d/%Y, %H:%M:%S')
 
 
 def tic():
