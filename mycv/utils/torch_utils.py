@@ -15,7 +15,7 @@ def set_random_seeds(random_seed=0):
     random.seed(random_seed)
 
 
-def load_partial(model, weights):
+def load_partial(model, weights, verbose=True):
     '''
     Load weights that have the same name
     '''
@@ -33,9 +33,10 @@ def load_partial(model, weights):
         if k in self_state and self_state[k].shape == v.shape:
             new_dic[k] = v
     model.load_state_dict(new_dic, strict=False)
-    print(f'{type(model).__name__}: {len(self_state)} layers,',
-            f'saved: {len(external_state)} layers,',
-            f'overlap & loaded: {len(new_dic)} layers')
+    if verbose:
+        print(f'{type(model).__name__}: {len(self_state)} layers,',
+              f'saved: {len(external_state)} layers,',
+              f'overlap & loaded: {len(new_dic)} layers')
 
 
 def initialize_weights(model):
