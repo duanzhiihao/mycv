@@ -46,6 +46,7 @@ def train():
     cfg.img_size = 320
     cfg.ema_decay = 0.99
     cfg.ema_warmup_epochs = 4
+    cfg.sync_bn = False
     IS_MAIN = (cfg.local_rank in [-1, 0])
     # initialize wandb
     if IS_MAIN:
@@ -120,6 +121,10 @@ def train():
             best_fitness = 0
             results = {metric: 0}
         start_epoch = 0
+
+    # SyncBatchNorm
+    if local_rank != -1 and cfg.sync_bn:
+        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
     # Exponential moving average
     if IS_MAIN and cfg.ema:
@@ -211,6 +216,7 @@ def train():
                 # Weights & Biases logging
                 if niter % 100 == 0:
                     wbrun.log({
+                        'epoch': epoch,
                         'metric/train_loss': train_loss,
                         'metric/train_acc': train_acc,
                         'ema/n_updates': ema.updates if ema is not None else -1,
@@ -250,11 +256,11 @@ def train():
                 'epoch'    : epoch,
                 metric     : results[metric]
             }
-            torch.save(checkpoint, log_dir / 'last.pt')
+            torch.save(checkpoint, log_dir.parent / 'last.pt')
             # save best checkpoint
             if results[metric] > best_fitness:
                 best_fitness = results[metric]
-                torch.save(checkpoint, log_dir / 'best.pt')
+                torch.save(checkpoint, log_dir.parent / 'best.pt')
             del checkpoint
         # ----Epoch end
     # ----Training end
