@@ -7,6 +7,7 @@ import torch
 def is_image(im):
     flag = isinstance(im, np.ndarray) and im.dtype == np.uint8 and \
            im.ndim == 3 and im.shape[2] == 3
+    return flag
 
 
 def get_img(img_path, out_type='tensor', div=16, color='RGB'):
@@ -37,6 +38,23 @@ def to_tensor(im: np.ndarray):
     assert im.shape[2] == 3 and im.dtype == np.uint8
     im = torch.from_numpy(im).permute(2, 0, 1).float() / 255.0
     im: torch.FloatTensor
+    return im
+
+
+def to_numpy_img(im: torch.Tensor, clamp=True):
+    '''
+    im: RGB, uin8, 0-255, [h,w,3]
+    '''
+    assert im.dtype == torch.float32
+    im = im.cpu()
+    if im.dim() == 4:
+        assert im.shape[0] == 1
+        im = im.squeeze(0)
+    assert im.dim() == 3 and im.shape[0] == 3
+    if clamp:
+        im = torch.clamp(im, min=0, max=1)
+    im = (im * 255).to(dtype=torch.uint8).permute(1, 2, 0).numpy()
+    im: np.ndarray
     return im
 
 
