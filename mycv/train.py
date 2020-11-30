@@ -27,11 +27,11 @@ def cal_acc(p: torch.Tensor, labels: torch.LongTensor):
 def train():
     # ====== set the run settings ======
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model',      type=str,  default='res101')
+    parser.add_argument('--model',      type=str,  default='res50')
     parser.add_argument('--resume',     type=str,  default='')
     parser.add_argument('--batch_size', type=int,  default=64)
     parser.add_argument('--amp',        type=bool, default=True)
-    parser.add_argument('--ema',        type=bool, default=False)
+    parser.add_argument('--ema',        type=bool, default=True)
     parser.add_argument('--optimizer',  type=str,  default='Adam', choices=['Adam', 'SGD'])
     parser.add_argument('--epochs',     type=int,  default=100)
     parser.add_argument('--metric',     type=str,  default='top1', choices=['top1'])
@@ -44,6 +44,8 @@ def train():
     cfg.momentum = 0.937
     cfg.nesterov = True
     cfg.img_size = 320
+    cfg.ema_decay = 0.99
+    cfg.ema_warmup_epochs = 4
     IS_MAIN = (cfg.local_rank in [-1, 0])
     # initialize wandb
     if IS_MAIN:
@@ -60,8 +62,8 @@ def train():
     assert cfg.batch_size % world_size == 0, 'batch_size must be multiple of device count'
     batch_size: int = cfg.batch_size // world_size
     if IS_MAIN:
-        print(cfg)
-        print('Batch size on each single GPU =', batch_size)
+        print(cfg, '\n')
+        print('Batch size on each single GPU =', batch_size, '\n')
     # fix random seeds for reproducibility
     set_random_seeds(1)
     # device setting
@@ -120,7 +122,10 @@ def train():
         start_epoch = 0
 
     # Exponential moving average
-    ema = ModelEMA(model) if (IS_MAIN and cfg.ema) else None
+    if IS_MAIN and cfg.ema:
+        ema = ModelEMA(model, decay=cfg.ema_decay)
+    else:
+        ema = None
 
     # DDP mode
     if local_rank != -1:
@@ -141,6 +146,9 @@ def train():
     )
     if ema:
         ema.updates = start_epoch * len(trainloader)  # set EMA updates
+        ema.warmup = cfg.ema_warmup_epochs * len(trainloader) # 4 epochs
+        cfg.ema_start_updates = ema.updates
+        cfg.ema_warmup_iters = ema.warmup
 
     # ======================== start training ========================
     for epoch in range(start_epoch, epochs):
