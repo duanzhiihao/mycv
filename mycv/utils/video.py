@@ -29,8 +29,8 @@ def play_frames(frames: list):
     Args:
         frames: list of RGB frames
     '''
-    for im in frames:
-        assert imgUtils.is_image(im)
+    for i, im in enumerate(frames):
+        assert imgUtils.is_image(im), f"The {i}'th frame is not a valid image"
         im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
         cv2.imshow('Press q to exit', im)
         if cv2.waitKey(200) & 0xFF == ord('q'):
