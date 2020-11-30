@@ -6,7 +6,7 @@ from tqdm import tqdm
 import cv2
 import torch
 
-from mycv.utils.image_ops import letterbox
+from mycv.utils.image import letterbox
 from mycv.utils.aug import rand_aug_cls
 from mycv.paths import FOOD101_DIR
 

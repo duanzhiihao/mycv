@@ -4,7 +4,7 @@ import cv2
 import torch
 
 from mycv.paths import COCO_DIR
-from mycv.utils.image_ops import letterbox
+from mycv.utils.image import letterbox
 
 
 COCO2017_CLS_IDS = [

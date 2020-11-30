@@ -5,7 +5,7 @@ from tqdm import tqdm
 import cv2
 import torch
 
-from mycv.utils.image_ops import letterbox
+from mycv.utils.image import letterbox
 from mycv.paths import ILSVRC_DIR
 
 def get_classes():
