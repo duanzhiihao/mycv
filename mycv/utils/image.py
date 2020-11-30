@@ -4,6 +4,11 @@ import cv2
 import torch
 
 
+def is_image(im):
+    flag = isinstance(im, np.ndarray) and im.dtype == np.uint8 and \
+           im.ndim == 3 and im.shape[2] == 3
+
+
 def get_img(img_path, out_type='tensor', div=16, color='RGB'):
     '''
     Read image
@@ -25,17 +30,38 @@ def get_img(img_path, out_type='tensor', div=16, color='RGB'):
         return im
 
 
-def pad_divisible(im: np.ndarray, div):
+def to_tensor(im: np.ndarray):
     '''
-    zero-pad the bottom and right border such that \
-        the image is divisible by div
+    im: RGB, uin8, 0-255, [h,w,3]
     '''
-    H_ORG, W_ORG, ch = im.shape
-    h_pad = round(div * np.ceil(H_ORG / div))
-    w_pad = round(div * np.ceil(W_ORG / div))
+    assert im.shape[2] == 3 and im.dtype == np.uint8
+    im = torch.from_numpy(im).permute(2, 0, 1).float() / 255.0
+    im: torch.FloatTensor
+    return im
+
+
+def pad_divisible(im: np.ndarray, div: int):
+    '''
+    zero-pad the bottom and right border such that the image [h,w] are multiple of div
+    '''
+    h_old, w_old, ch = im.shape
+    h_pad = round(div * np.ceil(h_old / div))
+    w_pad = round(div * np.ceil(w_old / div))
     padded = np.zeros([h_pad, w_pad, ch], dtype=im.dtype)
-    padded[:H_ORG, :W_ORG, :] = im
+    padded[:h_old, :w_old, :] = im
     return padded
+
+
+def crop_divisible(im: np.ndarray, div: int):
+    '''
+    Crop the bottom and right border such that the image [h,w] are multiple of div
+    '''
+    assert len(im.shape) == 3 and isinstance(div, int)
+    h_old, w_old, ch = im.shape
+    h_crop = div * (h_old // div)
+    w_crop = div * (w_old // div)
+    cropped = im[:h_crop, :w_crop, :]
+    return cropped
 
 
 def letterbox(img: np.ndarray, tgt_size:int=640, side='longer', to_square=True, div=1,
