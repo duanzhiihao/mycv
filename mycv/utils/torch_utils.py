@@ -100,17 +100,22 @@ class ModelEMA:
         # if next(model.parameters()).device.type != 'cpu':
         #     self.ema.half()  # FP16 EMA
         self.updates = updates  # number of EMA updates
-        self.decay = lambda x: decay * (1 - np.exp(-x / 2000))  # decay exponential ramp (to help early epochs)
+        self.final_decay = decay  # final decay
+        # decay exponential ramp (to help early epochs)
         for p in self.ema.parameters():
             p.requires_grad_(False)
+    
+    def get_decay(self):
+        decay = self.final_decay * (1 - np.exp(-self.updates / 2000))
+        return decay
 
     def update(self, model):
         # Update EMA parameters
         with torch.no_grad():
             self.updates += 1
-            d = self.decay(self.updates)
-
-            msd = model.module.state_dict() if is_parallel(model) else model.state_dict()  # model state_dict
+            d = self.get_decay()
+            # model state_dict
+            msd = model.module.state_dict() if is_parallel(model) else model.state_dict()
             for k, v in self.ema.state_dict().items():
                 if v.dtype.is_floating_point:
                     v *= d

@@ -10,7 +10,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 import wandb
 
 from mycv.utils.timer import now
-from mycv.utils.torch_utils import load_partial, set_random_seeds
+from mycv.utils.torch_utils import load_partial, set_random_seeds, ModelEMA
 # from mycv.datasets.imagenet import ImageNetCls, imagenet_val
 from mycv.datasets.food101 import Food101, food101_val
 
@@ -37,7 +37,7 @@ def train():
     parser.add_argument('--metric',     type=str,  default='top1', choices=['top1'])
     parser.add_argument('--log_root',   type=str,  default='runs/food101')
     parser.add_argument('--device',     type=int,  default=0)
-    parser.add_argument('--workers',    type=int,  default=8)
+    parser.add_argument('--workers',    type=int,  default=4)
     parser.add_argument('--local_rank', type=int,  default=-1, help='DDP arg, do not modify')
     cfg = parser.parse_args()
     cfg.lr = 0.0002
@@ -120,9 +120,7 @@ def train():
         start_epoch = 0
 
     # Exponential moving average
-    if cfg.ema:
-        raise NotImplementedError()
-        # ema = ModelEMA(model) if rank in [-1, 0] else None
+    ema = ModelEMA(model) if (IS_MAIN and cfg.ema) else None
 
     # DDP mode
     if local_rank != -1:
@@ -141,6 +139,8 @@ def train():
         trainset, batch_size=batch_size, shuffle=(sampler is None), sampler=sampler,
         num_workers=cfg.workers, pin_memory=True
     )
+    if ema:
+        ema.updates = start_epoch * len(trainloader)  # set EMA updates
 
     # ======================== start training ========================
     for epoch in range(start_epoch, epochs):
@@ -183,6 +183,8 @@ def train():
             scaler.step(optimizer)
             scaler.update()
             optimizer.zero_grad()
+            if ema:
+                ema.update(model)
 
             # logging
             if IS_MAIN:
@@ -198,11 +200,13 @@ def train():
                 )
                 pbar.set_description(s)
                 torch.cuda.reset_peak_memory_stats()
-                # Tensorboard
-                if niter % 200 == 0:
+                # Weights & Biases logging
+                if niter % 100 == 0:
                     wbrun.log({
                         'metric/train_loss': train_loss,
-                        'metric/train_acc':  train_acc
+                        'metric/train_acc': train_acc,
+                        'ema/n_updates': ema.updates if ema is not None else -1,
+                        'ema/decay': ema.get_decay() if ema is not None else -1
                     }, step=niter)
                     # model.eval()
                     # results = food101_val(model, img_size=hyp['img_size'],
@@ -219,8 +223,8 @@ def train():
 
         # Evaluation
         if IS_MAIN:
-            model.eval()
-            results = food101_val(model, img_size=cfg.img_size,
+            _val_model = ema.ema if ema is not None else model
+            results = food101_val(_val_model, img_size=cfg.img_size,
                         batch_size=4*batch_size, workers=cfg.workers)
             # results is like {'top1': xxx, 'top5': xxx}
             wbrun.log(
@@ -232,7 +236,7 @@ def train():
                 f.write(res + '\n')
             # save last checkpoint
             checkpoint = {
-                'model'    : model.state_dict(),
+                'model'    : _val_model.state_dict(),
                 'optimizer': optimizer.state_dict(),
                 'scaler'   : scaler.state_dict(),
                 'epoch'    : epoch,
