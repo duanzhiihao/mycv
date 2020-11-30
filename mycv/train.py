@@ -115,8 +115,9 @@ def train():
             log_dir = Path(wbrun.dir) # wandb logging dir
             assert log_dir.exists()
             print(str(model), file=open(log_dir / 'model.txt', 'w'))
+            best_fitness = 0
+            results = {metric: 0}
         start_epoch = 0
-        best_fitness = 0
 
     # Exponential moving average
     if cfg.ema:
@@ -142,7 +143,7 @@ def train():
     )
 
     # ======================== start training ========================
-    for epoch in range(epochs):
+    for epoch in range(start_epoch, epochs):
         model.train()
         if local_rank != -1:
             trainloader.sampler.set_epoch(epoch)
