@@ -93,20 +93,26 @@ class ModelEMA:
     A smoothed version of the weights is necessary for some training schemes to perform well.
     This class is sensitive where it is initialized in the sequence of model init,
     GPU assignment and distributed training wrappers.
+
+    Args:
+        decay: final decay when updates -> infinity
+        updates: initial num. of updates
+        warmup: num. of updates to reach 0.632 * decay
     """
-    def __init__(self, model, decay=0.999, updates=0):
+    def __init__(self, model, decay=0.99, updates=0, warmup=2000):
         # Create EMA
         self.ema = deepcopy(model.module if is_parallel(model) else model).eval()  # FP32 EMA
         # if next(model.parameters()).device.type != 'cpu':
         #     self.ema.half()  # FP16 EMA
         self.updates = updates  # number of EMA updates
+        self.warmup = warmup
         self.final_decay = decay  # final decay
         # decay exponential ramp (to help early epochs)
         for p in self.ema.parameters():
             p.requires_grad_(False)
     
     def get_decay(self):
-        decay = self.final_decay * (1 - np.exp(-self.updates / 2000))
+        decay = self.final_decay * (1 - np.exp(-self.updates / self.warmup))
         return decay
 
     def update(self, model):
