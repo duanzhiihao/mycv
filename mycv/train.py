@@ -8,10 +8,11 @@ import torch
 import torch.cuda.amp as amp
 from torch.nn.parallel import DistributedDataParallel as DDP
 import wandb
+# os.environ["WANDB_MODE"] = "dryrun"
 
 from mycv.utils.timer import now
 from mycv.utils.torch_utils import load_partial, set_random_seeds, ModelEMA
-# from mycv.datasets.imagenet import ImageNetCls, imagenet_val
+from mycv.datasets.imagenet import ImageNetCls, imagenet_val
 from mycv.datasets.food101 import Food101, food101_val
 
 
@@ -27,9 +28,10 @@ def cal_acc(p: torch.Tensor, labels: torch.LongTensor):
 def train():
     # ====== set the run settings ======
     parser = argparse.ArgumentParser()
+    parser.add_argument('--wb_project', type=str,  default='imagenet')
     parser.add_argument('--model',      type=str,  default='res50')
     parser.add_argument('--resume',     type=str,  default='')
-    parser.add_argument('--batch_size', type=int,  default=64)
+    parser.add_argument('--batch_size', type=int,  default=128)
     parser.add_argument('--amp',        type=bool, default=True)
     parser.add_argument('--ema',        type=bool, default=True)
     parser.add_argument('--optimizer',  type=str,  default='Adam', choices=['Adam', 'SGD'])
@@ -43,14 +45,14 @@ def train():
     cfg.lr = 0.0002
     cfg.momentum = 0.937
     cfg.nesterov = True
-    cfg.img_size = 320
+    cfg.img_size = 256
     cfg.ema_decay = 0.99
     cfg.ema_warmup_epochs = 4
     cfg.sync_bn = False
     IS_MAIN = (cfg.local_rank in [-1, 0])
     # initialize wandb
     if IS_MAIN:
-        wbrun = wandb.init(project='food101', group=cfg.model, name=now(),
+        wbrun = wandb.init(project=cfg.wb_project, group=cfg.model, name=now(),
                            config=cfg)
         cfg = wbrun.config
 
@@ -84,10 +86,10 @@ def train():
     # Initialize model
     if cfg.model == 'res50':
         from mycv.models.cls.resnet import resnet50
-        model = resnet50(num_classes=101)
+        model = resnet50(num_classes=1000)
     elif cfg.model == 'res101':
         from mycv.models.cls.resnet import resnet101
-        model = resnet101(num_classes=101)
+        model = resnet101(num_classes=1000)
         # load_partial(model, 'weights/resnet101-5d3b4d8f.pth', verbose=IS_MAIN)
     model = model.to(device)
     # loss function
@@ -140,8 +142,8 @@ def train():
     if IS_MAIN:
         print('Initializing Datasets and Dataloaders...')
     # training set
-    # trainset = ImageNetCls(split='train', img_size=hyp['img_size'], augment=True)
-    trainset = Food101(split='train', img_size=cfg.img_size, augment=True)
+    trainset = ImageNetCls(split='train', img_size=cfg.img_size, augment=True)
+    # trainset = Food101(split='train', img_size=cfg.img_size, augment=True)
     sampler = torch.utils.data.distributed.DistributedSampler(
         trainset, num_replicas=world_size, rank=local_rank, shuffle=True
     ) if local_rank != -1 else None
@@ -223,10 +225,10 @@ def train():
                         'ema/decay': ema.get_decay() if ema is not None else -1
                     }, step=niter)
                     # model.eval()
+                    # results = imagenet_val(model, img_size=cfg.img_size,
+                    #     batch_size=4*batch_size, workers=cfg.workers)
                     # results = food101_val(model, img_size=hyp['img_size'],
                     #             batch_size=4*batch_size, workers=cfg.workers)
-                    # val_acc = results['top1']
-                    # tb_writer.add_scalar('metric/val_acc', val_acc,  global_step=niter)
                     # model.train()
                 # logging end
             # ----Mini batch end
@@ -238,7 +240,9 @@ def train():
         # Evaluation
         if IS_MAIN:
             _val_model = ema.ema if ema is not None else model
-            results = food101_val(_val_model, img_size=cfg.img_size,
+            # results = food101_val(_val_model, img_size=cfg.img_size,
+            #             batch_size=4*batch_size, workers=cfg.workers)
+            results = imagenet_val(_val_model, img_size=cfg.img_size,
                         batch_size=4*batch_size, workers=cfg.workers)
             # results is like {'top1': xxx, 'top5': xxx}
             wbrun.log(
