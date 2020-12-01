@@ -35,3 +35,4 @@ def play_frames(frames: list):
         cv2.imshow('Press q to exit', im)
         if cv2.waitKey(200) & 0xFF == ord('q'):
             break
+    cv2.destroyAllWindows()
