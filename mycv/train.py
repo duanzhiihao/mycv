@@ -42,7 +42,7 @@ def train():
     parser.add_argument('--workers',    type=int,  default=4)
     parser.add_argument('--local_rank', type=int,  default=-1, help='DDP arg, do not modify')
     cfg = parser.parse_args()
-    cfg.lr = 0.0002
+    cfg.lr = 0.0004
     cfg.momentum = 0.937
     cfg.nesterov = True
     cfg.img_size = 256
