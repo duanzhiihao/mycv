@@ -31,7 +31,7 @@ def train():
     parser.add_argument('--wb_project', type=str,  default='imagenet')
     parser.add_argument('--model',      type=str,  default='res50')
     parser.add_argument('--resume',     type=str,  default='')
-    parser.add_argument('--batch_size', type=int,  default=128)
+    parser.add_argument('--batch_size', type=int,  default=256)
     parser.add_argument('--amp',        type=bool, default=True)
     parser.add_argument('--ema',        type=bool, default=True)
     parser.add_argument('--optimizer',  type=str,  default='Adam', choices=['Adam', 'SGD'])
@@ -39,11 +39,12 @@ def train():
     parser.add_argument('--metric',     type=str,  default='top1', choices=['top1'])
     parser.add_argument('--log_root',   type=str,  default='runs/food101')
     parser.add_argument('--device',     type=int,  default=0)
-    parser.add_argument('--workers',    type=int,  default=4)
+    parser.add_argument('--workers',    type=int,  default=8)
     parser.add_argument('--local_rank', type=int,  default=-1, help='DDP arg, do not modify')
     cfg = parser.parse_args()
     cfg.lr = 0.0004
     cfg.momentum = 0.937
+    cfg.weight_decay = 0.0005
     cfg.nesterov = True
     cfg.img_size = 256
     cfg.ema_decay = 0.99
@@ -95,12 +96,27 @@ def train():
     # loss function
     loss_func = torch.nn.CrossEntropyLoss(reduction='mean')
 
+    # different optimization setting for different layers
+    parameters = []
+    for k, v in model.named_parameters():
+        # batchnorm or bias
+        if ('.bn' in k) or ('.bias' in k):
+            lr = cfg.lr
+            decay = 0.0
+        # conv weights
+        else:
+            assert '.weight' in k
+            lr = cfg.lr
+            decay = cfg.weight_decay
+
+        parameters += [{'params': v, 'lr': lr, 'weight_decay': decay}]
+
     # optimizer
     if cfg.optimizer == 'SGD':
         raise NotImplementedError()
-        # optimizer = torch.optim.SGD(model.parameters(), lr=hyp['lr'])
+        # optimizer = torch.optim.SGD(parameters, lr=hyp['lr'])
     elif cfg.optimizer == 'Adam':
-        optimizer = torch.optim.Adam(model.parameters(), lr=cfg.lr)
+        optimizer = torch.optim.Adam(parameters, lr=cfg.lr)
     scaler = amp.GradScaler(enabled=cfg.amp)
 
     if cfg.resume:
