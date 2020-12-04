@@ -237,8 +237,8 @@ def train():
                         'epoch': epoch,
                         'metric/train_loss': train_loss,
                         'metric/train_acc': train_acc,
-                        'ema/n_updates': ema.updates if ema is not None else -1,
-                        'ema/decay': ema.get_decay() if ema is not None else -1
+                        'ema/n_updates': ema.updates if ema is not None else 0,
+                        'ema/decay': ema.get_decay() if ema is not None else 0
                     }, step=niter)
                     # model.eval()
                     # results = imagenet_val(model, img_size=cfg.img_size,
