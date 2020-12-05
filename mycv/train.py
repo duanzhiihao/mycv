@@ -6,6 +6,7 @@ from tqdm import tqdm
 import random
 import torch
 import torch.cuda.amp as amp
+from torch.optim.lr_scheduler import LambdaLR
 from torch.nn.parallel import DistributedDataParallel as DDP
 import wandb
 # os.environ["WANDB_MODE"] = "dryrun"
@@ -42,15 +43,23 @@ def train():
     parser.add_argument('--workers',    type=int,  default=8)
     parser.add_argument('--local_rank', type=int,  default=-1, help='DDP arg, do not modify')
     cfg = parser.parse_args()
+    # model
+    cfg.img_size = 256
+    cfg.sync_bn = False
+    # optimizer
     cfg.lr = 0.0004
     cfg.momentum = 0.937
     cfg.weight_decay = 0.0005
     cfg.nesterov = True
-    cfg.img_size = 256
+    # lr scheduler
+    cfg.lrf = 0.1 # min lr factor
+    cfg.lr_warmup_epochs = 1
+    # EMA
     cfg.ema_decay = 0.99
     cfg.ema_warmup_epochs = 4
-    cfg.sync_bn = False
+    # Main process
     IS_MAIN = (cfg.local_rank in [-1, 0])
+
     # initialize wandb
     if IS_MAIN:
         wbrun = wandb.init(project=cfg.wb_project, group=cfg.model, name=now(),
@@ -84,6 +93,20 @@ def train():
     print(f'Local rank: {local_rank}, using device {device}:', 'device property:',
           torch.cuda.get_device_properties(device))
 
+    # Dataset
+    if IS_MAIN:
+        print('Initializing Datasets and Dataloaders...')
+    # training set
+    trainset = ImageNetCls(split='train', img_size=cfg.img_size, augment=True)
+    # trainset = Food101(split='train', img_size=cfg.img_size, augment=True)
+    sampler = torch.utils.data.distributed.DistributedSampler(
+        trainset, num_replicas=world_size, rank=local_rank, shuffle=True
+    ) if local_rank != -1 else None
+    trainloader = torch.utils.data.DataLoader(
+        trainset, batch_size=batch_size, shuffle=(sampler is None), sampler=sampler,
+        num_workers=cfg.workers, pin_memory=True
+    )
+
     # Initialize model
     if cfg.model == 'res50':
         from mycv.models.cls.resnet import resnet50
@@ -97,19 +120,19 @@ def train():
     loss_func = torch.nn.CrossEntropyLoss(reduction='mean')
 
     # different optimization setting for different layers
-    parameters = []
+    pg0, pg1 = [], []
     for k, v in model.named_parameters():
-        # batchnorm or bias
-        if ('.bn' in k) or ('.bias' in k):
-            lr = cfg.lr
-            decay = 0.0
-        # conv weights
-        else:
+        if ('.bn' in k) or ('.bias' in k): # batchnorm or bias
+            pg0.append(v)
+        else: # conv weights
             assert '.weight' in k
-            lr = cfg.lr
-            decay = cfg.weight_decay
-
-        parameters += [{'params': v, 'lr': lr, 'weight_decay': decay}]
+            pg1.append(v)
+    parameters = [
+        {'params': pg0, 'lr': cfg.lr, 'weight_decay': 0.0},
+        {'params': pg1, 'lr': cfg.lr, 'weight_decay': cfg.weight_decay}
+    ]
+    if IS_MAIN:
+        print('Parameter groups:', [len(pg['params']) for pg in parameters])
 
     # optimizer
     if cfg.optimizer == 'SGD':
@@ -117,6 +140,7 @@ def train():
         # optimizer = torch.optim.SGD(parameters, lr=hyp['lr'])
     elif cfg.optimizer == 'Adam':
         optimizer = torch.optim.Adam(parameters, lr=cfg.lr)
+    # AMP
     scaler = amp.GradScaler(enabled=cfg.amp)
 
     if cfg.resume:
@@ -140,6 +164,18 @@ def train():
             results = {metric: 0}
         start_epoch = 0
 
+    # lr scheduler
+    def warmup_cosine(x):
+        warmup_iter = cfg.lr_warmup_epochs * len(trainloader)
+        if x < warmup_iter:
+            factor = x / warmup_iter
+        else:
+            _cur = x - warmup_iter + 1
+            _total = epochs * len(trainloader)
+            factor = cfg.lrf + 0.5 * (1 - cfg.lrf) * (1 + math.cos(_cur * math.pi / _total))
+        return factor
+    scheduler = LambdaLR(optimizer, lr_lambda=warmup_cosine, last_epoch=start_epoch - 1)
+
     # SyncBatchNorm
     if local_rank != -1 and cfg.sync_bn:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
@@ -154,19 +190,6 @@ def train():
     if local_rank != -1:
         model = DDP(model, device_ids=[local_rank], output_device=local_rank)
 
-    # Dataset
-    if IS_MAIN:
-        print('Initializing Datasets and Dataloaders...')
-    # training set
-    trainset = ImageNetCls(split='train', img_size=cfg.img_size, augment=True)
-    # trainset = Food101(split='train', img_size=cfg.img_size, augment=True)
-    sampler = torch.utils.data.distributed.DistributedSampler(
-        trainset, num_replicas=world_size, rank=local_rank, shuffle=True
-    ) if local_rank != -1 else None
-    trainloader = torch.utils.data.DataLoader(
-        trainset, batch_size=batch_size, shuffle=(sampler is None), sampler=sampler,
-        num_workers=cfg.workers, pin_memory=True
-    )
     if ema:
         ema.updates = start_epoch * len(trainloader)  # set EMA updates
         ema.warmup = cfg.ema_warmup_epochs * len(trainloader) # 4 epochs
@@ -183,7 +206,6 @@ def train():
         pbar = enumerate(trainloader)
         if IS_MAIN:
             train_loss, train_acc = 0.0, 0.0
-            cur_lr = optimizer.param_groups[0]['lr']
             pbar_title = ('%-10s' * 6) % (
                 'Epoch', 'GPU_mem', 'lr', 'tr_loss', 'tr_acc', metric
             )
@@ -216,17 +238,20 @@ def train():
             optimizer.zero_grad()
             if ema:
                 ema.update(model)
+            # Scheduler
+            scheduler.step()
 
             # logging
             if IS_MAIN:
                 niter = epoch * len(trainloader) + i
+                cur_lr = optimizer.param_groups[0]['lr']
                 loss = loss.detach().cpu().item()
                 acc = cal_acc(p.detach(), labels)
                 train_loss = (train_loss*i + loss) / (i+1)
                 train_acc  = (train_acc*i + acc) / (i+1)
                 mem = torch.cuda.max_memory_allocated() / 1e9
                 s = ('%-10s' * 2 + '%-10.4g' * 4) % (
-                    f'{epoch}/{epochs}', f'{mem:.3g}G',
+                    f'{epoch}/{epochs-1}', f'{mem:.3g}G',
                     cur_lr, train_loss, 100*train_acc, 100*results[metric]
                 )
                 pbar.set_description(s)
@@ -234,7 +259,8 @@ def train():
                 # Weights & Biases logging
                 if niter % 100 == 0:
                     wbrun.log({
-                        'epoch': epoch,
+                        'general/epoch': epoch,
+                        'general/lr': cur_lr,
                         'metric/train_loss': train_loss,
                         'metric/train_acc': train_acc,
                         'ema/n_updates': ema.updates if ema is not None else 0,
