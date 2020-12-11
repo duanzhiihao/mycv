@@ -32,7 +32,7 @@ def train():
     parser.add_argument('--wb_project', type=str,  default='imagenet')
     parser.add_argument('--model',      type=str,  default='res50')
     parser.add_argument('--resume',     type=str,  default='')
-    parser.add_argument('--batch_size', type=int,  default=256)
+    parser.add_argument('--batch_size', type=int,  default=128)
     parser.add_argument('--amp',        type=bool, default=True)
     parser.add_argument('--ema',        type=bool, default=True)
     parser.add_argument('--optimizer',  type=str,  default='Adam', choices=['Adam', 'SGD'])
@@ -40,7 +40,7 @@ def train():
     parser.add_argument('--metric',     type=str,  default='top1', choices=['top1'])
     parser.add_argument('--log_root',   type=str,  default='runs/food101')
     parser.add_argument('--device',     type=int,  default=0)
-    parser.add_argument('--workers',    type=int,  default=8)
+    parser.add_argument('--workers',    type=int,  default=4)
     parser.add_argument('--local_rank', type=int,  default=-1, help='DDP arg, do not modify')
     cfg = parser.parse_args()
     # model
