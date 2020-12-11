@@ -2,10 +2,13 @@ import os
 from pathlib import Path
 import json
 from tqdm import tqdm
+import random
 import cv2
+import albumentations as album
 import torch
 
-from mycv.utils.image import letterbox
+import mycv.utils.image as imgUtils
+import mycv.utils.aug as augUtils
 from mycv.paths import ILSVRC_DIR
 
 def get_classes():
@@ -25,7 +28,7 @@ class ImageNetCls(torch.utils.data.Dataset):
     '''
     ImageNet Classification dataset
     '''
-    def __init__(self, split='train', img_size=256, augment=True, to_square=True):
+    def __init__(self, split='train', img_size=224):
         assert os.path.exists(ILSVRC_DIR)
         assert isinstance(img_size, int)
 
@@ -46,8 +49,10 @@ class ImageNetCls(torch.utils.data.Dataset):
 
         self.split     = split
         self.img_size  = img_size
-        self.to_square = to_square
-        self.augment   = augment
+        self.transform = album.Compose([
+            album.RandomCrop(img_size, img_size, p=1.0),
+            album.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.6, hue=0.04, p=1)
+        ])
         self._input_mean = torch.FloatTensor(RGB_MEAN).view(3, 1, 1)
         self._input_std  = torch.FloatTensor(RGB_STD).view(3, 1, 1)
 
@@ -68,22 +73,26 @@ class ImageNetCls(torch.utils.data.Dataset):
             label = -1
 
         # data augmentation
-        if self.augment:
+        # im = self.transform(im)
+        if self.split == 'train':
+            low, high = int(self.img_size/224*256), int(self.img_size/224*384)
+            im = augUtils.random_scale(im, low=low, high=high)
+            # im = augUtils.random_crop(im, crop_hw=(self.img_size,self.img_size))
+            im = self.transform(image=im)['image']
             if torch.rand(1).item() > 0.5:
                 im = cv2.flip(im, 1) # horizontal flip
-        # resize, pad to square
-        side = 'longer' if self.to_square else 'shorter'
-        im, ratio, pads = letterbox(im, tgt_size=self.img_size, side=side,
-                                    to_square=self.to_square, div=32)
+        else:
+            # resize and center crop
+            im = imgUtils.scale(im, int(self.img_size/224*256), side='shorter')
+            im = imgUtils.center_crop(im, crop_hw=(self.img_size,self.img_size))
+        assert imgUtils.is_image(im)
+
         # to tensor
         im = torch.from_numpy(im).permute(2, 0, 1).float() / 255
         # normalize such that mean = 0 and std = 1
         im = (im - self._input_mean) / self._input_std
 
-        if self.to_square:
-            assert im.shape[1:] == (self.img_size, self.img_size)
-        else:
-            assert im.shape[1] == self.img_size or im.shape[2] == self.img_size
+        assert im.shape[1:] == (self.img_size, self.img_size)
         return im, label
 
 
@@ -99,8 +108,7 @@ def imagenet_val(model, img_size, batch_size, workers):
     device = next(model.parameters()).device
 
     # test set
-    to_square = False if batch_size == 1 else True
-    testset = ImageNetCls('val', img_size=img_size, augment=False, to_square=to_square)
+    testset = ImageNetCls('val', img_size=img_size)
     testloader = torch.utils.data.DataLoader(
         testset, batch_size=batch_size, shuffle=False, num_workers=workers,
         pin_memory=True, drop_last=False
@@ -117,7 +125,8 @@ def imagenet_val(model, img_size, batch_size, workers):
         # debugging
         # if True:
         #     import matplotlib.pyplot as plt
-        #     im = imgs[0].permute(1,2,0).numpy()
+        #     im = imgs[0] * testset._input_std + testset._input_mean
+        #     im = im.permute(1,2,0).numpy()
         #     plt.imshow(im); plt.show()
         imgs = imgs.to(device=device)
         with torch.no_grad():
@@ -134,8 +143,13 @@ def imagenet_val(model, img_size, batch_size, workers):
 
 
 if __name__ == "__main__":
-    dataset = ImageNetCls(split='val')
+    dataset = ImageNetCls(split='train')
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=2)
-    data = next(iter(dataloader))
 
-    debug = 1
+    import matplotlib.pyplot as plt
+    for imgs, labels in dataloader:
+        for im, lbl in zip(imgs, labels):
+            im = im * dataset._input_std + dataset._input_mean
+            im = im.permute(1,2,0).numpy()
+            plt.imshow(im); plt.show()
+

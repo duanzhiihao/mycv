@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 # Project root dir
-MYCV_DIR = os.path.dirname(__file__)
+MYCV_DIR = Path(os.path.dirname(__file__))
 
 # Network weights dir
 WEIGHTS_DIR = Path(os.path.dirname(__file__)) / 'weights'

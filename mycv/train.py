@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 import argparse
-import yaml
 from tqdm import tqdm
 import math
 import random
@@ -98,7 +97,7 @@ def train():
     if IS_MAIN:
         print('Initializing Datasets and Dataloaders...')
     # training set
-    trainset = ImageNetCls(split='train', img_size=cfg.img_size, augment=True)
+    trainset = ImageNetCls(split='train', img_size=cfg.img_size)
     # trainset = Food101(split='train', img_size=cfg.img_size, augment=True)
     sampler = torch.utils.data.distributed.DistributedSampler(
         trainset, num_replicas=world_size, rank=local_rank, shuffle=True
@@ -218,7 +217,7 @@ def train():
             #     import matplotlib.pyplot as plt
             #     from mycv.datasets.food101 import CLASS_NAMES
             #     for im, lbl in zip(imgs, labels):
-            #         im = im * trainset._input_std + trainset._input_std
+            #         im = im * trainset._input_std + trainset._input_mean
             #         im = im.permute(1,2,0).numpy()
             #         print(CLASS_NAMES[lbl])
             #         plt.imshow(im); plt.show()
@@ -317,10 +316,10 @@ if __name__ == '__main__':
     train()
 
     # from mycv.models.cls.resnet import resnet50
-    # model = resnet50(num_classes=101)
-    # weights = torch.load('runs/food101/res50_2/weights/last.pt')
-    # model.load_state_dict(weights['model'])
+    # model = resnet50(num_classes=1000)
+    # weights = torch.load('weights/resnet50-19c8e357.pth')
+    # model.load_state_dict(weights)
     # model = model.cuda()
     # model.eval()
-    # results = food101_val(model, img_size=256, batch_size=4, workers=0)
+    # results = imagenet_val(model, img_size=224, batch_size=64, workers=4)
     # print(results['top1'])

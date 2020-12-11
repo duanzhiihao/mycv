@@ -82,6 +82,45 @@ def crop_divisible(im: np.ndarray, div: int):
     return cropped
 
 
+def scale(im: np.ndarray, size: int, side='shorter'):
+    """ resize the image such that the shorter/longer side of the image = size
+
+    Args:
+        im (np.ndarray): image
+        size (int): target size
+    """
+    assert is_image(im)
+    old_hw = im.shape[:2]
+    if side == 'longer':
+        ratio = size / max(old_hw[0], old_hw[1]) # Scale ratio (new / old)
+    else:
+        assert side == 'shorter'
+        ratio = size / min(old_hw[0], old_hw[1]) # Scale ratio (new / old)
+    if ratio != 1:
+        new_h = round(old_hw[0] * ratio)
+        new_w = round(old_hw[1] * ratio)
+        im = cv2.resize(im, dsize=(new_w, new_h))
+    return im
+
+
+def center_crop(im: np.ndarray, crop_hw: tuple):
+    """ center crop
+
+    Args:
+        im (np.ndarray): image
+        crop_hw (tuple): target (height, width)
+    """    
+    assert is_image(im)
+    height, width = im.shape[:2]
+    ch, cw = crop_hw
+    if height < ch or width < cw:
+        raise ValueError()
+    y1 = (height - ch) // 2
+    x1 = (width - cw) // 2
+    im = im[y1:y1+ch, x1:x1+cw, :]
+    return im
+
+
 def letterbox(img: np.ndarray, tgt_size:int=640, side='longer', to_square=True, div=1,
               color=(114,114,114)):
     '''
