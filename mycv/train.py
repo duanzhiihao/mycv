@@ -9,9 +9,9 @@ import torch.cuda.amp as amp
 from torch.optim.lr_scheduler import LambdaLR
 from torch.nn.parallel import DistributedDataParallel as DDP
 import wandb
-# os.environ["WANDB_MODE"] = "dryrun"
+os.environ["WANDB_MODE"] = "dryrun"
 
-from mycv.utils.timer import now
+from mycv.utils.general import increment_dir
 from mycv.utils.torch_utils import load_partial, set_random_seeds, ModelEMA
 from mycv.datasets.imagenet import ImageNetCls, imagenet_val
 from mycv.datasets.food101 import Food101, food101_val
@@ -29,22 +29,21 @@ def cal_acc(p: torch.Tensor, labels: torch.LongTensor):
 def train():
     # ====== set the run settings ======
     parser = argparse.ArgumentParser()
-    parser.add_argument('--wb_project', type=str,  default='imagenet')
+    parser.add_argument('--project',    type=str,  default='imagenet')
     parser.add_argument('--model',      type=str,  default='res50')
     parser.add_argument('--resume',     type=str,  default='')
     parser.add_argument('--batch_size', type=int,  default=128)
     parser.add_argument('--amp',        type=bool, default=True)
     parser.add_argument('--ema',        type=bool, default=True)
     parser.add_argument('--optimizer',  type=str,  default='Adam', choices=['Adam', 'SGD'])
-    parser.add_argument('--epochs',     type=int,  default=100)
+    parser.add_argument('--epochs',     type=int,  default=64)
     parser.add_argument('--metric',     type=str,  default='top1', choices=['top1'])
-    parser.add_argument('--log_root',   type=str,  default='runs/food101')
     parser.add_argument('--device',     type=int,  default=0)
-    parser.add_argument('--workers',    type=int,  default=4)
+    parser.add_argument('--workers',    type=int,  default=8)
     parser.add_argument('--local_rank', type=int,  default=-1, help='DDP arg, do not modify')
     cfg = parser.parse_args()
     # model
-    cfg.img_size = 256
+    cfg.img_size = 224
     cfg.sync_bn = False
     # optimizer
     cfg.lr = 0.0004
@@ -52,19 +51,13 @@ def train():
     cfg.weight_decay = 0.0005
     cfg.nesterov = True
     # lr scheduler
-    cfg.lrf = 0.1 # min lr factor
+    cfg.lrf = 1 # min lr factor
     cfg.lr_warmup_epochs = 1
     # EMA
     cfg.ema_decay = 0.99
     cfg.ema_warmup_epochs = 4
     # Main process
     IS_MAIN = (cfg.local_rank in [-1, 0])
-
-    # initialize wandb
-    if IS_MAIN:
-        wbrun = wandb.init(project=cfg.wb_project, group=cfg.model, name=now(),
-                           config=cfg)
-        cfg = wbrun.config
 
     # check arguments
     metric:     str = cfg.metric.lower()
@@ -79,6 +72,7 @@ def train():
         print('Batch size on each single GPU =', batch_size, '\n')
     # fix random seeds for reproducibility
     set_random_seeds(1)
+    torch.backends.cudnn.benchmark = True
     # device setting
     assert torch.cuda.is_available()
     if local_rank == -1: # Single GPU
@@ -143,26 +137,41 @@ def train():
     # AMP
     scaler = amp.GradScaler(enabled=cfg.amp)
 
+    log_parent = Path(f'runs/{cfg.project}')
     if cfg.resume:
-        raise NotImplementedError()
         # resume
-        log_dir = Path(cfg.log_root) / cfg.resume
-        assert os.path.isdir(log_dir)
-        checkpoint = torch.load(log_dir / 'weights/last.pt')
+        run_name = cfg.resume
+        log_dir = log_parent / run_name
+        assert log_dir.is_dir()
+        checkpoint = torch.load(log_dir / 'last.pt')
         model.load_state_dict(checkpoint['model'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         scaler.load_state_dict(checkpoint['scaler'])
         start_epoch = checkpoint['epoch'] + 1
         best_fitness = checkpoint.get(metric, 0)
+        if IS_MAIN:
+            wb_id = open(log_dir / 'wandb_id.txt', 'r').read()
     else:
         # new experiment
         if IS_MAIN:
-            log_dir = Path(wbrun.dir) # wandb logging dir
-            assert log_dir.exists()
+            run_name = increment_dir(dir_root=log_parent, name=cfg.model)
+            log_dir = log_parent / run_name # wandb logging dir
+            os.makedirs(log_dir, exist_ok=False)
             print(str(model), file=open(log_dir / 'model.txt', 'w'))
             best_fitness = 0
             results = {metric: 0}
+            wb_id = None
         start_epoch = 0
+
+    # initialize wandb
+    if IS_MAIN:
+        wbrun = wandb.init(project=cfg.project, name=run_name, config=cfg,
+                           dir='runs/', resume='allow', id=wb_id)
+        cfg = wbrun.config
+        cfg.log_dir = log_dir
+        if not (log_dir / 'wandb_id.txt').exists():
+            with open(log_dir / 'wandb_id.txt', 'w') as f:
+                f.write(wbrun.id)
 
     # lr scheduler
     def warmup_cosine(x):
@@ -302,11 +311,11 @@ def train():
                 'epoch'    : epoch,
                 metric     : results[metric]
             }
-            torch.save(checkpoint, log_dir.parent / 'last.pt')
+            torch.save(checkpoint, log_dir / 'last.pt')
             # save best checkpoint
             if results[metric] > best_fitness:
                 best_fitness = results[metric]
-                torch.save(checkpoint, log_dir.parent / 'best.pt')
+                torch.save(checkpoint, log_dir / 'best.pt')
             del checkpoint
         # ----Epoch end
     # ----Training end
