@@ -9,7 +9,6 @@ import torch.cuda.amp as amp
 from torch.optim.lr_scheduler import LambdaLR
 from torch.nn.parallel import DistributedDataParallel as DDP
 import wandb
-os.environ["WANDB_MODE"] = "dryrun"
 
 from mycv.utils.general import increment_dir
 from mycv.utils.torch_utils import load_partial, set_random_seeds, ModelEMA
@@ -35,10 +34,11 @@ def train():
     parser.add_argument('--batch_size', type=int,  default=128)
     parser.add_argument('--amp',        type=bool, default=True)
     parser.add_argument('--ema',        type=bool, default=True)
-    parser.add_argument('--optimizer',  type=str,  default='Adam', choices=['Adam', 'SGD'])
-    parser.add_argument('--epochs',     type=int,  default=64)
+    parser.add_argument('--optimizer',  type=str,  default='SGD', choices=['Adam', 'SGD'])
+    parser.add_argument('--epochs',     type=int,  default=32)
     parser.add_argument('--metric',     type=str,  default='top1', choices=['top1'])
     parser.add_argument('--device',     type=int,  default=0)
+    parser.add_argument('--dryrun',     action='store_true')
     parser.add_argument('--workers',    type=int,  default=8)
     parser.add_argument('--local_rank', type=int,  default=-1, help='DDP arg, do not modify')
     cfg = parser.parse_args()
@@ -46,15 +46,15 @@ def train():
     cfg.img_size = 224
     cfg.sync_bn = False
     # optimizer
-    cfg.lr = 0.0004
-    cfg.momentum = 0.937
-    cfg.weight_decay = 0.0005
+    cfg.lr = 0.01
+    cfg.momentum = 0.9
+    cfg.weight_decay = 0.0001
     cfg.nesterov = True
     # lr scheduler
-    cfg.lrf = 1 # min lr factor
+    cfg.lrf = 0.1 # min lr factor
     cfg.lr_warmup_epochs = 1
     # EMA
-    cfg.ema_decay = 0.99
+    cfg.ema_decay = 0.999
     cfg.ema_warmup_epochs = 4
     # Main process
     IS_MAIN = (cfg.local_rank in [-1, 0])
@@ -114,24 +114,24 @@ def train():
     loss_func = torch.nn.CrossEntropyLoss(reduction='mean')
 
     # different optimization setting for different layers
-    pg0, pg1 = [], []
+    pgb, pgw = [], []
     for k, v in model.named_parameters():
         if ('.bn' in k) or ('.bias' in k): # batchnorm or bias
-            pg0.append(v)
+            pgb.append(v)
         else: # conv weights
             assert '.weight' in k
-            pg1.append(v)
+            pgw.append(v)
     parameters = [
-        {'params': pg0, 'lr': cfg.lr, 'weight_decay': 0.0},
-        {'params': pg1, 'lr': cfg.lr, 'weight_decay': cfg.weight_decay}
+        {'params': pgb, 'lr': cfg.lr, 'weight_decay': 0.0},
+        {'params': pgw, 'lr': cfg.lr, 'weight_decay': cfg.weight_decay}
     ]
     if IS_MAIN:
         print('Parameter groups:', [len(pg['params']) for pg in parameters])
+    del pgb, pgw
 
     # optimizer
     if cfg.optimizer == 'SGD':
-        raise NotImplementedError()
-        # optimizer = torch.optim.SGD(parameters, lr=hyp['lr'])
+        optimizer = torch.optim.SGD(parameters, lr=cfg.lr)
     elif cfg.optimizer == 'Adam':
         optimizer = torch.optim.Adam(parameters, lr=cfg.lr)
     # AMP
@@ -164,11 +164,14 @@ def train():
         start_epoch = 0
 
     # initialize wandb
+    if cfg.dryrun:
+        os.environ["WANDB_MODE"] = "dryrun"
     if IS_MAIN:
         wbrun = wandb.init(project=cfg.project, name=run_name, config=cfg,
                            dir='runs/', resume='allow', id=wb_id)
         cfg = wbrun.config
         cfg.log_dir = log_dir
+        cfg.wandb_id = wbrun.id
         if not (log_dir / 'wandb_id.txt').exists():
             with open(log_dir / 'wandb_id.txt', 'w') as f:
                 f.write(wbrun.id)

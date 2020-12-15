@@ -66,7 +66,7 @@ class ImageNetCls(torch.utils.data.Dataset):
         assert im is not None, f'Error loading image {impath}'
         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
         # label
-        wnid = impath.split('\\')[-2]
+        wnid = Path(impath).parts[-2]
         if self.split == 'train':
             label = WNID_TO_IDX[wnid]
         else:
