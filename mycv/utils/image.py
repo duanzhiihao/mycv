@@ -11,9 +11,14 @@ def is_image(im):
 
 
 def get_img(img_path, out_type='tensor', div=16, color='RGB'):
-    '''
-    Read image
-    '''
+    """ Read image
+
+    Args:
+        img_path ([type]): [description]
+        out_type (str, optional): [description]. Defaults to 'tensor'.
+        div (int, optional): [description]. Defaults to 16.
+        color (str, optional): [description]. Defaults to 'RGB'.
+    """    
     im = cv2.imread(img_path)
     if color.upper() == 'RGB':
         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
@@ -32,9 +37,15 @@ def get_img(img_path, out_type='tensor', div=16, color='RGB'):
 
 
 def to_tensor(im: np.ndarray):
+    ''' Convert uint8 [0,255] HxWx3 np.ndarray to float32 [0,1] 3xHxW torch.Tensor
+
+    Args:
+        im (np.ndarray): RGB, uint8, 0-255, [h,w,3]
+
+    Returns:
+        im (torch.Tensor): RGB, float32, 0-1, [3,h,w]
     '''
-    im: RGB, uin8, 0-255, [h,w,3]
-    '''
+    assert is_image(im)
     assert im.shape[2] == 3 and im.dtype == np.uint8
     im = torch.from_numpy(im).permute(2, 0, 1).float() / 255.0
     im: torch.FloatTensor

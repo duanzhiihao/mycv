@@ -10,6 +10,7 @@ def load_frames(video_path, max_length=100):
     Load RGB frames using cv2
     '''
     vcap = cv2.VideoCapture(video_path)
+    assert vcap.isOpened(), f'Failed to load video {video_path}'
     frames = []
     for _ in range(max_length):
         flag, im = vcap.read()
@@ -29,7 +30,7 @@ def play_frames(frames: list, debug=False):
     """ Play the frames as a video using cv2
 
     Args:
-        frames (list): list of RGB frames
+        frames (list): list of RGB frames (np.ndarray, HxWx3)
         debug (bool, optional): plt.imshow() every frame. Defaults to False.
     """
     for i, im in enumerate(frames):

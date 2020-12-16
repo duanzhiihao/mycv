@@ -13,6 +13,16 @@ def set_random_seeds(random_seed=0):
     random.seed(random_seed)
 
 
+def num_params(model: nn.Module):
+    """ Get the number of parameters of a model.
+
+    Args:
+        model (nn.Module): pytorch model
+    """    
+    num = sum([p.numel() for p in model.parameters()])
+    return num
+
+
 def load_partial(model, weights, verbose=True):
     '''
     Load weights that have the same name
