@@ -29,16 +29,16 @@ def train():
     # ====== set the run settings ======
     parser = argparse.ArgumentParser()
     parser.add_argument('--project',    type=str,  default='imagenet')
-    parser.add_argument('--model',      type=str,  default='res50')
+    parser.add_argument('--model',      type=str,  default='yolov5l')
     parser.add_argument('--resume',     type=str,  default='')
-    parser.add_argument('--batch_size', type=int,  default=128)
+    parser.add_argument('--batch_size', type=int,  default=256)
     parser.add_argument('--amp',        type=bool, default=True)
     parser.add_argument('--ema',        type=bool, default=True)
     parser.add_argument('--optimizer',  type=str,  default='SGD', choices=['Adam', 'SGD'])
     parser.add_argument('--epochs',     type=int,  default=32)
     parser.add_argument('--metric',     type=str,  default='top1', choices=['top1'])
     parser.add_argument('--device',     type=int,  default=0)
-    parser.add_argument('--dryrun',     action='store_true')
+    parser.add_argument('--dryrun',     type=bool, default=False)
     parser.add_argument('--workers',    type=int,  default=8)
     parser.add_argument('--local_rank', type=int,  default=-1, help='DDP arg, do not modify')
     cfg = parser.parse_args()
@@ -109,6 +109,11 @@ def train():
         from mycv.models.cls.resnet import resnet101
         model = resnet101(num_classes=1000)
         # load_partial(model, 'weights/resnet101-5d3b4d8f.pth', verbose=IS_MAIN)
+    elif cfg.model == 'yolov5l':
+        from mycv.models.yolov5.csp import YOLOv5Cls
+        model = YOLOv5Cls(model='l', num_class=1000)
+    else:
+        raise NotImplementedError()
     model = model.to(device)
     # loss function
     loss_func = torch.nn.CrossEntropyLoss(reduction='mean')
@@ -297,7 +302,7 @@ def train():
             # results = food101_val(_val_model, img_size=cfg.img_size,
             #             batch_size=4*batch_size, workers=cfg.workers)
             results = imagenet_val(_val_model, img_size=cfg.img_size,
-                        batch_size=4*batch_size, workers=cfg.workers)
+                        batch_size=batch_size, workers=cfg.workers)
             # results is like {'top1': xxx, 'top5': xxx}
             wbrun.log(
                 {'metric/val_'+k: v for k,v in results.items()}, step=niter
