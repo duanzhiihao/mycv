@@ -30,7 +30,7 @@ class ImageNetCls(torch.utils.data.Dataset):
     '''
     ImageNet Classification dataset
     '''
-    def __init__(self, split='train', img_size=224):
+    def __init__(self, split='train', img_size=224, input_norm=True):
         assert os.path.exists(ILSVRC_DIR)
         assert isinstance(img_size, int)
 
@@ -58,6 +58,7 @@ class ImageNetCls(torch.utils.data.Dataset):
             album.RandomCrop(img_size, img_size, p=1.0),
             album.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.6, hue=0.04, p=1)
         ])
+        self._input_norm = input_norm
         self._input_mean = torch.FloatTensor(RGB_MEAN).view(3, 1, 1)
         self._input_std  = torch.FloatTensor(RGB_STD).view(3, 1, 1)
 
@@ -96,13 +97,14 @@ class ImageNetCls(torch.utils.data.Dataset):
         # to tensor
         im = torch.from_numpy(im).permute(2, 0, 1).float() / 255
         # normalize such that mean = 0 and std = 1
-        im = (im - self._input_mean) / self._input_std
+        if self._input_norm:
+            im = (im - self._input_mean) / self._input_std
 
         assert im.shape[1:] == (self.img_size, self.img_size)
         return im, label
 
 
-def imagenet_val(model, img_size, batch_size, workers, split='val'):
+def imagenet_val(model, img_size, batch_size, workers, split='val', input_norm=True):
     '''
     Test on ImageNet validation set
 
@@ -115,7 +117,7 @@ def imagenet_val(model, img_size, batch_size, workers, split='val'):
     device = next(model.parameters()).device
 
     # test set
-    testset = ImageNetCls(split=split, img_size=img_size)
+    testset = ImageNetCls(split=split, img_size=img_size, input_norm=input_norm)
     testloader = torch.utils.data.DataLoader(
         testset, batch_size=batch_size, shuffle=False, num_workers=workers,
         pin_memory=True, drop_last=False
