@@ -180,5 +180,5 @@ if __name__ == "__main__":
     model.load_state_dict(torch.load(WEIGHTS_DIR / 'resnet50-19c8e357.pth'))
     model = model.cuda()
     model.eval()
-    results = imagenet_val(model, img_size=224, batch_size=64, workers=4, split='val_600_100')
+    results = imagenet_val(model, img_size=224, batch_size=64, workers=4, split='val200_600')
     print(results['top1'])

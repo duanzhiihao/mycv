@@ -7,7 +7,7 @@ from mycv.datasets.imagenet import WNIDS
 
 
 def main():
-    sample(200, 600, 100)
+    sample(200, 600, 50)
 
 
 def sample(num_cls=200, num_train=600, num_val=100):
@@ -15,8 +15,8 @@ def sample(num_cls=200, num_train=600, num_val=100):
 
     train_root = ILSVRC_DIR / 'Data/CLS-LOC/train'
     # check if imageset file already exist
-    trainset_path = ILSVRC_DIR / f'ImageSets/CLS-LOC/train_{num_train}_{num_val}.txt'
-    valset_path = ILSVRC_DIR / f'ImageSets/CLS-LOC/val_{num_train}_{num_val}.txt'
+    trainset_path = ILSVRC_DIR / f'ImageSets/CLS-LOC/train{num_cls}_{num_train}.txt'
+    valset_path = ILSVRC_DIR / f'ImageSets/CLS-LOC/val{num_cls}_{num_train}.txt'
     if trainset_path.exists():
         print(f'Warning: {trainset_path} already exist. Removing it...')
         os.remove(trainset_path)
