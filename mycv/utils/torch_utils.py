@@ -1,5 +1,6 @@
 from pathlib import Path
 from copy import deepcopy
+from collections import OrderedDict
 import random
 import numpy as np
 import torch
@@ -24,19 +25,25 @@ def num_params(model: nn.Module):
 
 
 def load_partial(model, weights, verbose=True):
-    '''
-    Load weights that have the same name
+    ''' Load weights that have the same name
+    
+    Args:
+        model (torch.nn.Module): model
+        weights (str or dict): weights
+        verbose (bool, optional): print if True. Defaults to True.
     '''
     if isinstance(weights, (str, Path)):
-        print(f'Loading {type(model).__name__}() weights from {weights}...')
+        if verbose:
+            print(f'Loading {type(model).__name__}() weights from {weights}...')
         external_state = torch.load(weights)
     else:
         external_state = weights
     if 'model' in external_state:
         external_state = external_state['model']
+    assert isinstance(external_state, (dict, OrderedDict))
 
     self_state = model.state_dict()
-    new_dic = dict()
+    new_dic = OrderedDict()
     for k,v in external_state.items():
         if k in self_state and self_state[k].shape == v.shape:
             new_dic[k] = v
@@ -45,6 +52,28 @@ def load_partial(model, weights, verbose=True):
         print(f'{type(model).__name__}: {len(self_state)} layers,',
               f'saved: {len(external_state)} layers,',
               f'overlap & loaded: {len(new_dic)} layers')
+
+
+def rename_weights(weights, old, new, verbose=True):
+    """ replace old with new
+
+    Args:
+        weights (str or dict): weights
+        verbose (bool, optional): print if True. Defaults to True.
+    """
+    if isinstance(weights, (str, Path)):
+        if verbose:
+            print(f'Loading weights from {weights}...')
+        weights = torch.load(weights)
+    if 'model' in weights:
+        weights = weights['model']
+    assert isinstance(weights, (dict, OrderedDict))
+
+    new_dic = OrderedDict()
+    for k,v in weights.items():
+        k = k.replace(old, new)
+        new_dic[k] = v
+    return new_dic
 
 
 def initialize_weights(model):
