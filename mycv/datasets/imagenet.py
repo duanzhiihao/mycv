@@ -4,6 +4,8 @@ import json
 from tqdm import tqdm
 import random
 import cv2
+cv2.setNumThreads(0)
+cv2.ocl.setUseOpenCL(False)
 import albumentations as album
 import torch
 
@@ -39,7 +41,6 @@ class ImageNetCls(torch.utils.data.Dataset):
             list_path = root / 'ImageSets/CLS-LOC/val.txt'
         else:
             raise NotImplementedError()
-        print(f'Loading imagenet {split} list...')
         lines = open(list_path, 'r').read().strip().split('\n')
         self.img_paths = []
         for l in lines:
@@ -144,12 +145,12 @@ def imagenet_val(model, img_size, batch_size, workers):
 
 if __name__ == "__main__":
     dataset = ImageNetCls(split='train')
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=2)
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=2, num_workers=0)
 
     import matplotlib.pyplot as plt
-    for imgs, labels in dataloader:
+    for imgs, labels in tqdm(dataloader):
+        # continue
         for im, lbl in zip(imgs, labels):
             im = im * dataset._input_std + dataset._input_mean
             im = im.permute(1,2,0).numpy()
             plt.imshow(im); plt.show()
-

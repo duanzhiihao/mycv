@@ -38,9 +38,10 @@ def train():
     parser.add_argument('--epochs',     type=int,  default=32)
     parser.add_argument('--metric',     type=str,  default='top1', choices=['top1'])
     parser.add_argument('--device',     type=int,  default=0)
-    parser.add_argument('--dryrun',     type=bool, default=False)
-    parser.add_argument('--workers',    type=int,  default=8)
+    parser.add_argument('--workers',    type=int,  default=4)
     parser.add_argument('--local_rank', type=int,  default=-1, help='DDP arg, do not modify')
+    # parser.add_argument('--dryrun',   type=bool, default=True)
+    parser.add_argument('--dryrun',     action='store_true')
     cfg = parser.parse_args()
     # model
     cfg.img_size = 224
@@ -266,7 +267,7 @@ def train():
                 acc = cal_acc(p.detach(), labels)
                 train_loss = (train_loss*i + loss) / (i+1)
                 train_acc  = (train_acc*i + acc) / (i+1)
-                mem = torch.cuda.max_memory_allocated() / 1e9
+                mem = torch.cuda.max_memory_allocated(device) / 1e9
                 s = ('%-10s' * 2 + '%-10.4g' * 4) % (
                     f'{epoch}/{epochs-1}', f'{mem:.3g}G',
                     cur_lr, train_loss, 100*train_acc, 100*results[metric]
@@ -276,7 +277,6 @@ def train():
                 # Weights & Biases logging
                 if niter % 100 == 0:
                     wbrun.log({
-                        'general/epoch': epoch,
                         'general/lr': cur_lr,
                         'metric/train_loss': train_loss,
                         'metric/train_acc': train_acc,
@@ -298,22 +298,26 @@ def train():
 
         # Evaluation
         if IS_MAIN:
-            _val_model = ema.ema if ema is not None else model
             # results = food101_val(_val_model, img_size=cfg.img_size,
             #             batch_size=4*batch_size, workers=cfg.workers)
-            results = imagenet_val(_val_model, img_size=cfg.img_size,
-                        batch_size=batch_size, workers=cfg.workers)
             # results is like {'top1': xxx, 'top5': xxx}
-            wbrun.log(
-                {'metric/val_'+k: v for k,v in results.items()}, step=niter
-            )
+            _log_dic = {'general/epoch': epoch}
+            results = imagenet_val(model, img_size=cfg.img_size,
+                        batch_size=batch_size, workers=cfg.workers)
+            _log_dic.update({'metric/plain_val_'+k: v for k,v in results.items()})
+            if ema is not None:
+                results = imagenet_val(ema.ema, img_size=cfg.img_size,
+                            batch_size=batch_size, workers=cfg.workers)
+                _log_dic.update({'metric/ema_val_'+k: v for k,v in results.items()})
+            wbrun.log(_log_dic, step=niter)
             # Write evaluation results
             res = s + '||' + '%10.4g' * 1 % (results[metric])
             with open(log_dir / 'results.txt', 'a') as f:
                 f.write(res + '\n')
             # save last checkpoint
+            _save_model = ema.ema if ema is not None else model
             checkpoint = {
-                'model'    : _val_model.state_dict(),
+                'model'    : _save_model.state_dict(),
                 'optimizer': optimizer.state_dict(),
                 'scaler'   : scaler.state_dict(),
                 'epoch'    : epoch,
