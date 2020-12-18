@@ -29,7 +29,8 @@ def train():
     # ====== set the run settings ======
     parser = argparse.ArgumentParser()
     parser.add_argument('--project',    type=str,  default='imagenet')
-    parser.add_argument('--model',      type=str,  default='yolov5l')
+    parser.add_argument('--group',      type=str,  default='mini')
+    parser.add_argument('--model',      type=str,  default='res50')
     parser.add_argument('--resume',     type=str,  default='')
     parser.add_argument('--batch_size', type=int,  default=256)
     parser.add_argument('--amp',        type=bool, default=True)
@@ -91,8 +92,16 @@ def train():
     # Dataset
     if IS_MAIN:
         print('Initializing Datasets and Dataloaders...')
+    if cfg.group == 'default':
+        train_split = 'train'
+        val_split = 'val'
+        cfg.num_class = 1000
+    elif cfg.group == 'mini':
+        train_split = 'train_600_100'
+        val_split = 'val_600_100'
+        cfg.num_class = 200
     # training set
-    trainset = ImageNetCls(split='train', img_size=cfg.img_size)
+    trainset = ImageNetCls(split=train_split, img_size=cfg.img_size)
     # trainset = Food101(split='train', img_size=cfg.img_size, augment=True)
     sampler = torch.utils.data.distributed.DistributedSampler(
         trainset, num_replicas=world_size, rank=local_rank, shuffle=True
@@ -105,14 +114,14 @@ def train():
     # Initialize model
     if cfg.model == 'res50':
         from mycv.models.cls.resnet import resnet50
-        model = resnet50(num_classes=1000)
+        model = resnet50(num_classes=cfg.num_class)
     elif cfg.model == 'res101':
         from mycv.models.cls.resnet import resnet101
-        model = resnet101(num_classes=1000)
+        model = resnet101(num_classes=cfg.num_class)
         # load_partial(model, 'weights/resnet101-5d3b4d8f.pth', verbose=IS_MAIN)
     elif cfg.model == 'yolov5l':
         from mycv.models.yolov5.csp import YOLOv5Cls
-        model = YOLOv5Cls(model='l', num_class=1000)
+        model = YOLOv5Cls(model='l', num_class=cfg.num_class)
     else:
         raise NotImplementedError()
     model = model.to(device)
@@ -173,8 +182,8 @@ def train():
     if cfg.dryrun:
         os.environ["WANDB_MODE"] = "dryrun"
     if IS_MAIN:
-        wbrun = wandb.init(project=cfg.project, name=run_name, config=cfg,
-                           dir='runs/', resume='allow', id=wb_id)
+        wbrun = wandb.init(project=cfg.project, group=cfg.group, name=run_name,
+                           config=cfg, dir='runs/', resume='allow', id=wb_id)
         cfg = wbrun.config
         cfg.log_dir = log_dir
         cfg.wandb_id = wbrun.id
@@ -302,11 +311,11 @@ def train():
             #             batch_size=4*batch_size, workers=cfg.workers)
             # results is like {'top1': xxx, 'top5': xxx}
             _log_dic = {'general/epoch': epoch}
-            results = imagenet_val(model, img_size=cfg.img_size,
+            results = imagenet_val(model, split=val_split, img_size=cfg.img_size,
                         batch_size=batch_size, workers=cfg.workers)
             _log_dic.update({'metric/plain_val_'+k: v for k,v in results.items()})
             if ema is not None:
-                results = imagenet_val(ema.ema, img_size=cfg.img_size,
+                results = imagenet_val(ema.ema, split=val_split, img_size=cfg.img_size,
                             batch_size=batch_size, workers=cfg.workers)
                 _log_dic.update({'metric/ema_val_'+k: v for k,v in results.items()})
             wbrun.log(_log_dic, step=niter)
