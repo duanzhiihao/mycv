@@ -28,10 +28,10 @@ def train():
     # ====== set the run settings ======
     parser = argparse.ArgumentParser()
     parser.add_argument('--project',    type=str,  default='imagenet')
-    parser.add_argument('--group',      type=str,  default='mini')
+    parser.add_argument('--group',      type=str,  default='default')
     parser.add_argument('--model',      type=str,  default='res50')
     parser.add_argument('--resume',     type=str,  default='')
-    parser.add_argument('--batch_size', type=int,  default=256)
+    parser.add_argument('--batch_size', type=int,  default=128)
     parser.add_argument('--amp',        type=bool, default=True)
     parser.add_argument('--ema',        type=bool, default=True)
     parser.add_argument('--optimizer',  type=str,  default='SGD', choices=['Adam', 'SGD'])
@@ -52,10 +52,10 @@ def train():
     cfg.weight_decay = 0.0001
     cfg.nesterov = True
     # lr scheduler
-    cfg.lrf = 0.1 # min lr factor
+    cfg.lrf = 0.2 # min lr factor
     cfg.lr_warmup_epochs = 1
     # EMA
-    cfg.ema_decay = 0.999
+    # cfg.ema_decay = 0.999
     cfg.ema_warmup_epochs = 4
     # Main process
     IS_MAIN = (cfg.local_rank in [-1, 0])
@@ -206,19 +206,22 @@ def train():
 
     # Exponential moving average
     if IS_MAIN and cfg.ema:
-        ema = ModelEMA(model, decay=cfg.ema_decay)
+        emas = [
+            ModelEMA(model, decay=0.99),
+            ModelEMA(model, decay=0.999),
+            ModelEMA(model, decay=0.9999)
+        ]
     else:
-        ema = None
+        emas = None
 
     # DDP mode
     if local_rank != -1:
         model = DDP(model, device_ids=[local_rank], output_device=local_rank)
 
-    if ema:
-        ema.updates = start_epoch * len(trainloader)  # set EMA updates
-        ema.warmup = cfg.ema_warmup_epochs * len(trainloader) # 4 epochs
-        cfg.ema_start_updates = ema.updates
-        cfg.ema_warmup_iters = ema.warmup
+    if emas:
+        for ema in emas:
+            ema.updates = start_epoch * len(trainloader)  # set EMA updates
+            ema.warmup = cfg.ema_warmup_epochs * len(trainloader) # 4 epochs
 
     # ======================== start training ========================
     for epoch in range(start_epoch, epochs):
@@ -260,8 +263,9 @@ def train():
             scaler.step(optimizer)
             scaler.update()
             optimizer.zero_grad()
-            if ema:
-                ema.update(model)
+            if emas:
+                for ema in emas:
+                    ema.update(model)
             # Scheduler
             scheduler.step()
 
@@ -286,8 +290,10 @@ def train():
                         'general/lr': cur_lr,
                         'metric/train_loss': train_loss,
                         'metric/train_acc': train_acc,
-                        'ema/n_updates': ema.updates if ema is not None else 0,
-                        'ema/decay': ema.get_decay() if ema is not None else 0
+                        'ema/n_updates': emas[0].updates if emas is not None else 0,
+                        'ema0/decay': emas[0].get_decay() if emas is not None else 0,
+                        'ema1/decay': emas[1].get_decay() if emas is not None else 0,
+                        'ema2/decay': emas[2].get_decay() if emas is not None else 0,
                     }, step=niter)
                 # logging end
             # ----Mini batch end
@@ -303,17 +309,18 @@ def train():
             results = imagenet_val(model, split=val_split, img_size=cfg.img_size,
                         batch_size=batch_size, workers=cfg.workers)
             _log_dic.update({'metric/plain_val_'+k: v for k,v in results.items()})
-            if ema is not None:
-                results = imagenet_val(ema.ema, split=val_split, img_size=cfg.img_size,
-                            batch_size=batch_size, workers=cfg.workers)
-                _log_dic.update({'metric/ema_val_'+k: v for k,v in results.items()})
+            if emas is not None:
+                for ei, ema in enumerate(emas):
+                    results = imagenet_val(ema.ema, split=val_split, img_size=cfg.img_size,
+                                batch_size=batch_size, workers=cfg.workers)
+                    _log_dic.update({f'metric/ema{ei}_val_'+k: v for k,v in results.items()})
             wbrun.log(_log_dic, step=niter)
             # Write evaluation results
             res = s + '||' + '%10.4g' * 1 % (results[metric])
             with open(log_dir / 'results.txt', 'a') as f:
                 f.write(res + '\n')
             # save last checkpoint
-            _save_model = ema.ema if ema is not None else model
+            _save_model = emas[1].ema if emas is not None else model
             checkpoint = {
                 'model'    : _save_model.state_dict(),
                 'optimizer': optimizer.state_dict(),
