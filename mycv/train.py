@@ -11,9 +11,8 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 import wandb
 
 from mycv.utils.general import increment_dir
-from mycv.utils.torch_utils import load_partial, set_random_seeds, ModelEMA
+from mycv.utils.torch_utils import set_random_seeds, ModelEMA
 from mycv.datasets.imagenet import ImageNetCls, imagenet_val
-from mycv.datasets.food101 import Food101, food101_val
 
 
 def cal_acc(p: torch.Tensor, labels: torch.LongTensor):
@@ -102,7 +101,6 @@ def train():
         cfg.num_class = 200
     # training set
     trainset = ImageNetCls(split=train_split, img_size=cfg.img_size)
-    # trainset = Food101(split='train', img_size=cfg.img_size, augment=True)
     sampler = torch.utils.data.distributed.DistributedSampler(
         trainset, num_replicas=world_size, rank=local_rank, shuffle=True
     ) if local_rank != -1 else None
@@ -118,7 +116,6 @@ def train():
     elif cfg.model == 'res101':
         from mycv.models.cls.resnet import resnet101
         model = resnet101(num_classes=cfg.num_class)
-        # load_partial(model, 'weights/resnet101-5d3b4d8f.pth', verbose=IS_MAIN)
     elif cfg.model == 'yolov5l':
         from mycv.models.yolov5.csp import YOLOv5Cls
         model = YOLOv5Cls(model='l', num_class=cfg.num_class)
@@ -292,12 +289,6 @@ def train():
                         'ema/n_updates': ema.updates if ema is not None else 0,
                         'ema/decay': ema.get_decay() if ema is not None else 0
                     }, step=niter)
-                    # model.eval()
-                    # results = imagenet_val(model, img_size=cfg.img_size,
-                    #     batch_size=4*batch_size, workers=cfg.workers)
-                    # results = food101_val(model, img_size=hyp['img_size'],
-                    #             batch_size=4*batch_size, workers=cfg.workers)
-                    # model.train()
                 # logging end
             # ----Mini batch end
         # ----Epoch end
@@ -307,8 +298,6 @@ def train():
 
         # Evaluation
         if IS_MAIN:
-            # results = food101_val(_val_model, img_size=cfg.img_size,
-            #             batch_size=4*batch_size, workers=cfg.workers)
             # results is like {'top1': xxx, 'top5': xxx}
             _log_dic = {'general/epoch': epoch}
             results = imagenet_val(model, split=val_split, img_size=cfg.img_size,
