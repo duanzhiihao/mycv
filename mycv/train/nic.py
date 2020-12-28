@@ -29,7 +29,7 @@ def train():
     parser = argparse.ArgumentParser()
     parser.add_argument('--project',    type=str,  default='imagenet')
     parser.add_argument('--group',      type=str,  default='default')
-    parser.add_argument('--model',      type=str,  default='res50')
+    parser.add_argument('--model',      type=str,  default='mini')
     parser.add_argument('--resume',     type=str,  default='')
     parser.add_argument('--batch_size', type=int,  default=128)
     parser.add_argument('--amp',        type=bool, default=True)
