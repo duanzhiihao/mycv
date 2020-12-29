@@ -34,6 +34,47 @@ def yolov5backbone(width_multiple=0.5, depth_multiple=0.33):
     return backbone, channels
 
 
+class CustomBackbone(nn.Module):
+    '''
+    https://github.com/ultralytics/yolov5
+    '''
+    def __init__(self, width_multiple=0.5, depth_multiple=0.33, in_ch=3):
+        super().__init__()
+        scale = lambda x: max(round(x * depth_multiple), 1)
+        ceil8 = lambda x: int(math.ceil(x/8) * 8)
+        channels = [ceil8(ch*width_multiple) for ch in [64, 128, 256, 512, 1024]]
+
+        self.c1 = Conv(in_ch, channels[0], k=5, s=2)
+        self.b1 = BottleneckCSP(channels[0], channels[0], n=1)
+        # 2x
+        self.c2 = Conv(channels[0], channels[1], k=3, s=2)
+        self.b2 = BottleneckCSP(channels[1], channels[1], n=scale(3))
+        # 4x
+        self.c3 = Conv(channels[1], channels[2], k=3, s=2)
+        self.b3 = BottleneckCSP(channels[2], channels[2], n=scale(9))
+        # 8x
+        self.c4 = Conv(channels[2], channels[3], k=3, s=2)
+        self.b4 = BottleneckCSP(channels[3], channels[3], n=scale(9))
+        # 16x
+        self.c5 = Conv(channels[3], channels[4], k=3, s=2)
+        self.b5 = BottleneckCSP(channels[4], channels[4], n=scale(3))
+        # 32x
+        self.channels = channels
+    
+    def forward(self, x):
+        x = self.c1(x)
+        x = self.b1(x)
+        x = self.c2(x)
+        x = self.b2(x)
+        x = self.c3(x)
+        p3 = self.b3(x)
+        x = self.c4(p3)
+        p4 = self.b4(x)
+        x = self.c5(p4)
+        p5 = self.b5(x)
+        return [p3, p4, p5]
+
+
 def autopad(k, p=None):  # kernel, padding
     # Pad to 'same'
     if p is None:

@@ -104,7 +104,8 @@ class ImageNetCls(torch.utils.data.Dataset):
         return im, label
 
 
-def imagenet_val(model, img_size, batch_size, workers, split='val', input_norm=True):
+def imagenet_val(model, img_size, batch_size, workers, split='val', input_norm=True,
+                 testloader=None):
     '''
     Test on ImageNet validation set
 
@@ -117,11 +118,12 @@ def imagenet_val(model, img_size, batch_size, workers, split='val', input_norm=T
     device = next(model.parameters()).device
 
     # test set
-    testset = ImageNetCls(split=split, img_size=img_size, input_norm=input_norm)
-    testloader = torch.utils.data.DataLoader(
-        testset, batch_size=batch_size, shuffle=False, num_workers=workers,
-        pin_memory=True, drop_last=False
-    )
+    if testloader is None:
+        testset = ImageNetCls(split=split, img_size=img_size, input_norm=input_norm)
+        testloader = torch.utils.data.DataLoader(
+            testset, batch_size=batch_size, shuffle=False, num_workers=workers,
+            pin_memory=True, drop_last=False
+        )
     # annotations
     # https://github.com/google-research/reassessed-imagenet
     if split == 'val':

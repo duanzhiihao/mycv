@@ -23,7 +23,7 @@ def increment_dir(dir_root='runs/', name='exp'):
         n = max(ids) + 1
     else:
         n = 0
-    name = f'{name}_{n}' if name[-1].isdigit() else f'{name}{n}'
+    name = f'{name}_{n}'
     return name
 
 

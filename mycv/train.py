@@ -29,7 +29,7 @@ def train():
     parser = argparse.ArgumentParser()
     parser.add_argument('--project',    type=str,  default='imagenet')
     parser.add_argument('--group',      type=str,  default='mini200')
-    parser.add_argument('--model',      type=str,  default='res50')
+    parser.add_argument('--model',      type=str,  default='csp_s')
     parser.add_argument('--resume',     type=str,  default='')
     parser.add_argument('--batch_size', type=int,  default=128)
     parser.add_argument('--amp',        type=bool, default=True)
@@ -116,9 +116,14 @@ def train():
     elif cfg.model == 'res101':
         from mycv.models.cls.resnet import resnet101
         model = resnet101(num_classes=cfg.num_class)
-    elif cfg.model == 'yolov5l':
-        from mycv.models.yolov5.csp import YOLOv5Cls
-        model = YOLOv5Cls(model='l', num_class=cfg.num_class)
+    elif cfg.model.startswith('yolov5'):
+        from mycv.models.yolov5.cls import YOLOv5Cls
+        assert cfg.model[-1] in ['s', 'm', 'l']
+        model = YOLOv5Cls(model=cfg.model[-1], num_class=cfg.num_class)
+    elif cfg.model.startswith('csp'):
+        from mycv.models.yolov5.cls import CSP
+        assert cfg.model[-1] in ['s', 'm', 'l']
+        model = CSP(model=cfg.model[-1], num_class=cfg.num_class)
     else:
         raise NotImplementedError()
     model = model.to(device)
@@ -160,8 +165,8 @@ def train():
         optimizer.load_state_dict(checkpoint['optimizer'])
         scaler.load_state_dict(checkpoint['scaler'])
         start_epoch = checkpoint['epoch'] + 1
-        best_fitness = checkpoint.get(metric, 0)
         if IS_MAIN:
+            cur_fitness = best_fitness = checkpoint.get(metric, 0)
             wb_id = open(log_dir / 'wandb_id.txt', 'r').read()
     else:
         # new experiment
@@ -170,7 +175,7 @@ def train():
             log_dir = log_parent / run_name # wandb logging dir
             os.makedirs(log_dir, exist_ok=False)
             print(str(model), file=open(log_dir / 'model.txt', 'w'))
-            best_fitness = 0
+            cur_fitness = best_fitness = 0
             results = {metric: 0}
             wb_id = None
         start_epoch = 0
@@ -280,7 +285,7 @@ def train():
                 mem = torch.cuda.max_memory_allocated(device) / 1e9
                 s = ('%-10s' * 2 + '%-10.4g' * 4) % (
                     f'{epoch}/{epochs-1}', f'{mem:.3g}G',
-                    cur_lr, train_loss, 100*train_acc, 100*results[metric]
+                    cur_lr, train_loss, 100*train_acc, 100*cur_fitness
                 )
                 pbar.set_description(s)
                 torch.cuda.reset_peak_memory_stats()
@@ -317,6 +322,11 @@ def train():
                                 batch_size=batch_size, workers=cfg.workers)
                     _log_dic.update({f'metric/ema{ei}_val_'+k: v for k,v in results.items()})
                     res_emas[ei] = results[metric]
+                # select best result among all emas
+                _idx = torch.argmax(res_emas)
+                cur_fitness = res_emas[_idx]
+            else:
+                cur_fitness = results[metric]
             # wandb log
             wbrun.log(_log_dic, step=niter)
             # Write evaluation results
@@ -324,20 +334,19 @@ def train():
             with open(log_dir / 'results.txt', 'a') as f:
                 f.write(res + '\n')
             # save last checkpoint
-            _idx = torch.argmax(res_emas)
             _save_model = emas[_idx].ema if emas is not None else model
             checkpoint = {
                 'model'    : _save_model.state_dict(),
                 'optimizer': optimizer.state_dict(),
                 'scaler'   : scaler.state_dict(),
                 'epoch'    : epoch,
-                metric     : res_emas[_idx],
+                metric     : cur_fitness,
                 'ema_decay': emas[_idx].final_decay
             }
             torch.save(checkpoint, log_dir / 'last.pt')
             # save best checkpoint
-            if res_emas[_idx] > best_fitness:
-                best_fitness = res_emas[_idx]
+            if cur_fitness > best_fitness:
+                best_fitness = cur_fitness
                 torch.save(checkpoint, log_dir / 'best.pt')
             del checkpoint
         # ----Epoch end
