@@ -28,7 +28,7 @@ def train():
     # ====== set the run settings ======
     parser = argparse.ArgumentParser()
     parser.add_argument('--project',    type=str,  default='imagenet')
-    parser.add_argument('--group',      type=str,  default='default')
+    parser.add_argument('--group',      type=str,  default='mini200')
     parser.add_argument('--model',      type=str,  default='res50')
     parser.add_argument('--resume',     type=str,  default='')
     parser.add_argument('--batch_size', type=int,  default=128)
@@ -95,7 +95,7 @@ def train():
         train_split = 'train'
         val_split = 'val'
         cfg.num_class = 1000
-    elif cfg.group == 'mini':
+    elif cfg.group == 'mini200':
         train_split = 'train200_600'
         val_split = 'val200_600'
         cfg.num_class = 200
@@ -309,29 +309,35 @@ def train():
             results = imagenet_val(model, split=val_split, img_size=cfg.img_size,
                         batch_size=batch_size, workers=cfg.workers)
             _log_dic.update({'metric/plain_val_'+k: v for k,v in results.items()})
+
+            res_emas = torch.zeros(len(emas))
             if emas is not None:
                 for ei, ema in enumerate(emas):
                     results = imagenet_val(ema.ema, split=val_split, img_size=cfg.img_size,
                                 batch_size=batch_size, workers=cfg.workers)
                     _log_dic.update({f'metric/ema{ei}_val_'+k: v for k,v in results.items()})
+                    res_emas[ei] = results[metric]
+            # wandb log
             wbrun.log(_log_dic, step=niter)
             # Write evaluation results
             res = s + '||' + '%10.4g' * 1 % (results[metric])
             with open(log_dir / 'results.txt', 'a') as f:
                 f.write(res + '\n')
             # save last checkpoint
-            _save_model = emas[1].ema if emas is not None else model
+            _idx = torch.argmax(res_emas)
+            _save_model = emas[_idx].ema if emas is not None else model
             checkpoint = {
                 'model'    : _save_model.state_dict(),
                 'optimizer': optimizer.state_dict(),
                 'scaler'   : scaler.state_dict(),
                 'epoch'    : epoch,
-                metric     : results[metric]
+                metric     : res_emas[_idx],
+                'ema_decay': emas[_idx].final_decay
             }
             torch.save(checkpoint, log_dir / 'last.pt')
             # save best checkpoint
-            if results[metric] > best_fitness:
-                best_fitness = results[metric]
+            if res_emas[_idx] > best_fitness:
+                best_fitness = res_emas[_idx]
                 torch.save(checkpoint, log_dir / 'best.pt')
             del checkpoint
         # ----Epoch end
