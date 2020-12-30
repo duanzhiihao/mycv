@@ -45,6 +45,7 @@ def train():
     cfg = parser.parse_args()
     # model
     cfg.img_size = 224
+    cfg.input_norm = False
     cfg.sync_bn = False
     # optimizer
     cfg.lr = 0.01
@@ -100,13 +101,19 @@ def train():
         val_split = 'val200_600'
         cfg.num_class = 200
     # training set
-    trainset = ImageNetCls(split=train_split, img_size=cfg.img_size)
+    trainset = ImageNetCls(train_split, img_size=cfg.img_size, input_norm=cfg.input_norm)
     sampler = torch.utils.data.distributed.DistributedSampler(
         trainset, num_replicas=world_size, rank=local_rank, shuffle=True
     ) if local_rank != -1 else None
     trainloader = torch.utils.data.DataLoader(
         trainset, batch_size=batch_size, shuffle=(sampler is None), sampler=sampler,
         num_workers=cfg.workers, pin_memory=True
+    )
+    # test set
+    testloader = torch.utils.data.DataLoader(
+        ImageNetCls(split=val_split, img_size=cfg.img_size, input_norm=cfg.input_norm),
+        batch_size=batch_size, shuffle=False, num_workers=cfg.workers//2,
+        pin_memory=True, drop_last=False
     )
 
     # Initialize model
@@ -311,15 +318,13 @@ def train():
         if IS_MAIN:
             # results is like {'top1': xxx, 'top5': xxx}
             _log_dic = {'general/epoch': epoch}
-            results = imagenet_val(model, split=val_split, img_size=cfg.img_size,
-                        batch_size=batch_size, workers=cfg.workers)
+            results = imagenet_val(model, split=val_split, testloader=testloader)
             _log_dic.update({'metric/plain_val_'+k: v for k,v in results.items()})
 
             res_emas = torch.zeros(len(emas))
             if emas is not None:
                 for ei, ema in enumerate(emas):
-                    results = imagenet_val(ema.ema, split=val_split, img_size=cfg.img_size,
-                                batch_size=batch_size, workers=cfg.workers)
+                    results = imagenet_val(model, split=val_split, testloader=testloader)
                     _log_dic.update({f'metric/ema{ei}_val_'+k: v for k,v in results.items()})
                     res_emas[ei] = results[metric]
                 # select best result among all emas

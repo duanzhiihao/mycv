@@ -104,8 +104,8 @@ class ImageNetCls(torch.utils.data.Dataset):
         return im, label
 
 
-def imagenet_val(model, img_size, batch_size, workers, split='val', input_norm=True,
-                 testloader=None):
+def imagenet_val(model, split='val', testloader=None,
+                 img_size=None, batch_size=None, workers=None, input_norm=None):
     '''
     Test on ImageNet validation set
 
@@ -119,6 +119,7 @@ def imagenet_val(model, img_size, batch_size, workers, split='val', input_norm=T
 
     # test set
     if testloader is None:
+        assert all([v is not None for v in (img_size, batch_size, workers, input_norm)])
         testset = ImageNetCls(split=split, img_size=img_size, input_norm=input_norm)
         testloader = torch.utils.data.DataLoader(
             testset, batch_size=batch_size, shuffle=False, num_workers=workers,
