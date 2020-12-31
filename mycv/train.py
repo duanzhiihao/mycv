@@ -324,7 +324,7 @@ def train():
             res_emas = torch.zeros(len(emas))
             if emas is not None:
                 for ei, ema in enumerate(emas):
-                    results = imagenet_val(model, split=val_split, testloader=testloader)
+                    results = imagenet_val(ema.ema, split=val_split, testloader=testloader)
                     _log_dic.update({f'metric/ema{ei}_val_'+k: v for k,v in results.items()})
                     res_emas[ei] = results[metric]
                 # select best result among all emas
