@@ -11,17 +11,23 @@ MYCV_DIR = Path(os.path.dirname(__file__))
 # Network weights dir
 WEIGHTS_DIR = Path(os.path.dirname(__file__)) / 'weights'
 
-# COCO dataset: http://cocodataset.org/#home
-COCO_DIR = Path('D:/Datasets/COCO')
+# CLIC dataset: http://www.compression.cc/
+CLIC_DIR = Path('D:/Datasets/CLIC')
 
-# MW-R, HABBOF, and CEPDOF dataset: http://vip.bu.edu/projects/vsns/cossy/datasets/
-COSSY_DIR = Path('/home/duanzh/Projects/Datasets/COSSY')
+# Kodak dataset: http://www.cs.albany.edu/~xypan/research/snr/Kodak.html
+CLIC_DIR = Path('D:/Datasets/Kodak')
 
 # ImageNet dataset
 ILSVRC_DIR = Path('D:/Datasets/ILSVRC')
 
 # Food-101 dataset
 FOOD101_DIR = Path('D:/Datasets/food-101')
+
+# COCO dataset: http://cocodataset.org/#home
+COCO_DIR = Path('D:/Datasets/COCO')
+
+# MW-R, HABBOF, and CEPDOF dataset: http://vip.bu.edu/projects/vsns/cossy/datasets/
+COSSY_DIR = Path('/home/duanzh/Projects/Datasets/COSSY')
 
 # Global Wheat Head Detection dataset
 GWHD_DIR = Path('/home/duanzh/Projects/Datasets/GWHD')
