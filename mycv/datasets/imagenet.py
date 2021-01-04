@@ -134,7 +134,7 @@ def imagenet_val(model: torch.nn.Module, split='val', testloader=None,
     if split == 'val':
         labels_path = Path(ILSVRC_DIR) / 'Annotations' / 'cls_val_real.json'
         labels_all = json.load(open(labels_path, 'r'))
-        assert len(testset) == len(labels_all)
+        assert len(testloader.dataset) == len(labels_all)
     else:
         labels_all = []
 
