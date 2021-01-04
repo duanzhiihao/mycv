@@ -5,35 +5,30 @@ import torch
 
 
 def is_image(im):
-    flag = isinstance(im, np.ndarray) and im.dtype == np.uint8 and \
-           im.ndim == 3 and im.shape[2] == 3
+    flag = isinstance(im, np.ndarray) and im.dtype == np.uint8 \
+           and im.ndim == 3 and im.shape[2] == 3
     return flag
 
 
-def get_img(img_path, out_type='tensor', div=16, color='RGB'):
-    """ Read image
+def imread_tensor(img_path: str, div=16, color='RGB'):
+    """ Read image and convert to tensor
 
     Args:
-        img_path ([type]): [description]
-        out_type (str, optional): [description]. Defaults to 'tensor'.
+        img_path (str): image path
         div (int, optional): [description]. Defaults to 16.
-        color (str, optional): [description]. Defaults to 'RGB'.
+        color (str, optional): RGB or BGR. Defaults to 'RGB'.
     """    
     im = cv2.imread(img_path)
+    assert im is not None, f'Failed loading image {img_path}'
     if color.upper() == 'RGB':
         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
     else:
         assert color.upper == 'BGR'
     im = pad_divisible(im, div=div)
-    im = im.astype(np.float32) / 255.0
-    if out_type == 'array':
-        # 0~1, float32, RGB, HWC
-        return im
-    else:
-        assert out_type == 'tensor'
-        im = torch.from_numpy(im.transpose(2, 0, 1)) # C,H,W
-        im: torch.Tensor
-        return im
+    im = torch.from_numpy(im).permute(2, 0, 1).float() / 255.0 # C,H,W
+    # 0~1, float32, RGB, HWC
+    im: torch.Tensor
+    return im
 
 
 def to_tensor(im: np.ndarray):
