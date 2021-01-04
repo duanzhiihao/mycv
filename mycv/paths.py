@@ -15,7 +15,7 @@ WEIGHTS_DIR = Path(os.path.dirname(__file__)) / 'weights'
 CLIC_DIR = Path('D:/Datasets/CLIC')
 
 # Kodak dataset: http://www.cs.albany.edu/~xypan/research/snr/Kodak.html
-CLIC_DIR = Path('D:/Datasets/Kodak')
+KODAK_DIR = Path('D:/Datasets/Kodak')
 
 # ImageNet dataset
 ILSVRC_DIR = Path('D:/Datasets/ILSVRC')
