@@ -104,16 +104,20 @@ class ImageNetCls(torch.utils.data.Dataset):
         return im, label
 
 
-def imagenet_val(model, split='val', testloader=None,
+def imagenet_val(model: torch.nn.Module, split='val', testloader=None,
                  img_size=None, batch_size=None, workers=None, input_norm=None):
-    '''
-    Test on ImageNet validation set
+    """ Imagenet validation
 
     Args:
-        model: torch model
-    '''
+        model (torch.nn.Module): [description]
+        split (str, optional): [description]. Defaults to 'val'.
+        testloader ([type], optional): [description]. Defaults to None.
+        img_size ([type], optional): [description]. Defaults to None.
+        batch_size ([type], optional): [description]. Defaults to None.
+        workers ([type], optional): [description]. Defaults to None.
+        input_norm ([type], optional): [description]. Defaults to None.
+    """    
     assert split.startswith('val')
-    model: torch.nn.Module
     model.eval()
     device = next(model.parameters()).device
 
