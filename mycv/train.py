@@ -100,6 +100,8 @@ def train():
         train_split = 'train200_600'
         val_split = 'val200_600'
         cfg.num_class = 200
+    else:
+        raise ValueError()
     # training set
     trainset = ImageNetCls(train_split, img_size=cfg.img_size, input_norm=cfg.input_norm)
     sampler = torch.utils.data.distributed.DistributedSampler(
@@ -158,10 +160,15 @@ def train():
         optimizer = torch.optim.SGD(parameters, lr=cfg.lr)
     elif cfg.optimizer == 'Adam':
         optimizer = torch.optim.Adam(parameters, lr=cfg.lr)
+    else:
+        raise ValueError()
     # AMP
     scaler = amp.GradScaler(enabled=cfg.amp)
 
     log_parent = Path(f'runs/{cfg.project}')
+    wb_id = None
+    cur_fitness = best_fitness = 0
+    results = {metric: 0}
     if cfg.resume:
         # resume
         run_name = cfg.resume
@@ -177,14 +184,11 @@ def train():
             wb_id = open(log_dir / 'wandb_id.txt', 'r').read()
     else:
         # new experiment
+        run_name = increment_dir(dir_root=log_parent, name=cfg.model)
+        log_dir = log_parent / run_name # wandb logging dir
         if IS_MAIN:
-            run_name = increment_dir(dir_root=log_parent, name=cfg.model)
-            log_dir = log_parent / run_name # wandb logging dir
             os.makedirs(log_dir, exist_ok=False)
             print(str(model), file=open(log_dir / 'model.txt', 'w'))
-            cur_fitness = best_fitness = 0
-            results = {metric: 0}
-            wb_id = None
         start_epoch = 0
 
     # initialize wandb
@@ -199,6 +203,8 @@ def train():
         if not (log_dir / 'wandb_id.txt').exists():
             with open(log_dir / 'wandb_id.txt', 'w') as f:
                 f.write(wbrun.id)
+    else:
+        wbrun = None
 
     # lr scheduler
     def warmup_cosine(x):
@@ -236,6 +242,7 @@ def train():
             ema.warmup = cfg.ema_warmup_epochs * len(trainloader) # 4 epochs
 
     # ======================== start training ========================
+    niter = s = None
     for epoch in range(start_epoch, epochs):
         model.train()
         if local_rank != -1:
@@ -243,8 +250,8 @@ def train():
         optimizer.zero_grad()
 
         pbar = enumerate(trainloader)
+        train_loss, train_acc = 0.0, 0.0
         if IS_MAIN:
-            train_loss, train_acc = 0.0, 0.0
             pbar_title = ('%-10s' * 6) % (
                 'Epoch', 'GPU_mem', 'lr', 'tr_loss', 'tr_acc', metric
             )
@@ -330,8 +337,12 @@ def train():
                 # select best result among all emas
                 _idx = torch.argmax(res_emas)
                 cur_fitness = res_emas[_idx]
+                _save_model = emas[_idx].ema
+                best_decay  = emas[_idx].final_decay
             else:
                 cur_fitness = results[metric]
+                _save_model = model
+                best_decay  = 0
             # wandb log
             wbrun.log(_log_dic, step=niter)
             # Write evaluation results
@@ -339,14 +350,13 @@ def train():
             with open(log_dir / 'results.txt', 'a') as f:
                 f.write(res + '\n')
             # save last checkpoint
-            _save_model = emas[_idx].ema if emas is not None else model
             checkpoint = {
-                'model'    : _save_model.state_dict(),
-                'optimizer': optimizer.state_dict(),
-                'scaler'   : scaler.state_dict(),
-                'epoch'    : epoch,
-                metric     : cur_fitness,
-                'ema_decay': emas[_idx].final_decay
+                'model'     : _save_model.state_dict(),
+                'optimizer' : optimizer.state_dict(),
+                'scaler'    : scaler.state_dict(),
+                'epoch'     : epoch,
+                metric      : cur_fitness,
+                'best_decay': best_decay
             }
             torch.save(checkpoint, log_dir / 'last.pt')
             # save best checkpoint
