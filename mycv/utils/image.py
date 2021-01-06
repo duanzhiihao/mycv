@@ -17,7 +17,7 @@ def imread_tensor(img_path: str, div=16, color='RGB'):
         img_path (str): image path
         div (int, optional): [description]. Defaults to 16.
         color (str, optional): RGB or BGR. Defaults to 'RGB'.
-    """    
+    """
     im = cv2.imread(img_path)
     assert im is not None, f'Failed loading image {img_path}'
     if color.upper() == 'RGB':
@@ -115,7 +115,7 @@ def center_crop(im: np.ndarray, crop_hw: tuple):
     Args:
         im (np.ndarray): image
         crop_hw (tuple): target (height, width)
-    """    
+    """
     assert is_image(im)
     height, width = im.shape[:2]
     ch, cw = crop_hw
