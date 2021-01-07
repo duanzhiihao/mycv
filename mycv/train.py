@@ -167,7 +167,6 @@ def train():
 
     log_parent = Path(f'runs/{cfg.project}')
     wb_id = None
-    cur_fitness = best_fitness = 0
     results = {metric: 0}
     if cfg.resume:
         # resume
@@ -179,8 +178,8 @@ def train():
         optimizer.load_state_dict(checkpoint['optimizer'])
         scaler.load_state_dict(checkpoint['scaler'])
         start_epoch = checkpoint['epoch'] + 1
+        cur_fitness = best_fitness = checkpoint.get(metric, 0)
         if IS_MAIN:
-            cur_fitness = best_fitness = checkpoint.get(metric, 0)
             wb_id = open(log_dir / 'wandb_id.txt', 'r').read()
     else:
         # new experiment
@@ -190,6 +189,7 @@ def train():
             os.makedirs(log_dir, exist_ok=False)
             print(str(model), file=open(log_dir / 'model.txt', 'w'))
         start_epoch = 0
+        cur_fitness = best_fitness = 0
 
     # initialize wandb
     if cfg.dryrun:
@@ -229,17 +229,15 @@ def train():
             ModelEMA(model, decay=0.999),
             ModelEMA(model, decay=0.9999)
         ]
+        for ema in emas:
+            ema.updates = start_epoch * len(trainloader)  # set EMA updates
+            ema.warmup = cfg.ema_warmup_epochs * len(trainloader) # set EMA warmup
     else:
         emas = None
 
     # DDP mode
     if local_rank != -1:
         model = DDP(model, device_ids=[local_rank], output_device=local_rank)
-
-    if emas:
-        for ema in emas:
-            ema.updates = start_epoch * len(trainloader)  # set EMA updates
-            ema.warmup = cfg.ema_warmup_epochs * len(trainloader) # 4 epochs
 
     # ======================== start training ========================
     niter = s = None
