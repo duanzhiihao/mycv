@@ -1,5 +1,76 @@
+import torch
 import torch.nn as nn
-from mycv.models.nic.basic_module import ResBlock
+
+from mycv.models.nic.basic_module import ResBlock, UniverseQuant
+
+
+class IMCoding(nn.Module):
+    """
+    docstring
+    """
+    def __init__(self, enable_bpp=False):
+        super().__init__()
+        self.encoder = miniEnc(hyper=enable_bpp)
+        self.decoder = miniDec()
+
+        self.enable_bpp = enable_bpp
+        if not enable_bpp:
+            return
+        raise NotImplementedError()
+        # self.factorized_entropy_func = Entropy_bottleneck(96) # 4.1k
+        # self.hyper_dec = Hyper_Dec(96, 128, nums=[2,2,1,1]) # 2.7M
+        # self.p = P_Model(128, num=2) # 885k
+        # self.context = Complex_context(ch=128, nums=[3,2]) # 402k
+
+    def forward(self, x):
+        assert x.dim() == 4 and x.shape[1] == 3
+        assert x.shape[2] % 16 == 0 and x.shape[3] % 16 == 0
+
+        x, xp = self.encoder(x) # 3GB
+        if self.training:
+            # noise = torch.rand_like(x) - 0.5
+            # xq = x + noise
+            xq = UniverseQuant.apply(x)
+        else:
+            xq = torch.round(x)
+
+        output = self.decoder(xq) # 3GB
+        if not self.enable_bpp:
+            return output, (None, None)
+
+        raise NotImplementedError()
+        xq2, xp2 = self.factorized_entropy_func(xp, self.training)
+        x3 = self.hyper_dec(xq2)
+        hyper_dec = self.p(x3)
+        xp1 = self.context(xq, hyper_dec) # 2GB
+        return output, (xp1, xp2)
+
+    def encode(self, x):
+        ''' Encode only
+        '''
+        assert not self.training
+        x, _ = self.encoder(x)
+        return torch.round(x)
+
+    def decode(self, x, ori_hw=None, return_type='tensor'):
+        ''' Reconstruct the original image from the feature
+        '''
+        assert not self.training
+        output = self.decoder(x)
+        if ori_hw is not None:
+            h, w = ori_hw
+            output = output[:, :, 0:h, 0:w]
+        output.clamp_(min=0, max=1)
+        if return_type == 'tensor':
+            return output
+
+        assert return_type == 'array'
+        if output.shape[0] == 1:
+            img_rec = (output * 255).cpu().squeeze(0).permute(1,2,0)
+            img_rec = img_rec.to(dtype=torch.uint8).numpy()
+            return img_rec
+        else:
+            raise NotImplementedError()
 
 
 class miniEnc(nn.Module):

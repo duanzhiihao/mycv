@@ -40,6 +40,16 @@ def _get_imgpaths(datasets: list, verbose=True):
         for imname in img_names:
             impath = str(CLIC_DIR / 'train' / imname)
             img_paths.append(impath)
+    if 'CLIC400' in datasets:
+        if verbose:
+            print('Loading CLIC 400x400 dataset...')
+        from mycv.paths import CLIC_DIR
+        img_dir = CLIC_DIR / 'train400'
+        assert img_dir.exists()
+        img_names = os.listdir(img_dir)
+        for imname in img_names:
+            impath = str(img_dir / imname)
+            img_paths.append(impath)
     if 'Kodak' in datasets:
         raise NotImplementedError()
     if 'imagenet' in datasets:
@@ -83,7 +93,9 @@ class LoadImages(torch.utils.data.Dataset):
         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
 
         # data augmentation
-        assert min(im.shape[:2]) >= self.img_size
+        if min(im.shape[:2]) < self.img_size:
+            im = imgUtils.scale(im, size=self.img_size, side='shorter')
+        assert min(im.shape[:2]) >= self.img_size, f'{impath}, {im.shape}'
         im = augUtils.random_crop(im, crop_hw=(self.img_size,self.img_size))
         if torch.rand(1).item() > 0.5:
             im = cv2.flip(im, 1) # horizontal flip
@@ -156,10 +168,10 @@ def kodak_val(model: torch.nn.Module, input_norm=None):
         rec = rec.cpu().squeeze(0).permute(1, 2, 0)
         rec = (rec * 255).to(dtype=torch.uint8).numpy()
         ps = psnr_dB(im, rec)
-        if True: # debugging
-            import matplotlib.pyplot as plt
-            plt.figure(); plt.imshow(im)
-            plt.figure(); plt.imshow(rec); plt.show()
+        # if True: # debugging
+        #     import matplotlib.pyplot as plt
+        #     plt.figure(); plt.imshow(im)
+        #     plt.figure(); plt.imshow(rec); plt.show()
         # recording
         msssim_all.append(ms)
         psnr_all.append(ps)
@@ -175,22 +187,21 @@ def kodak_val(model: torch.nn.Module, input_norm=None):
 
 
 if __name__ == "__main__":
-    dataset = LoadImages(datasets=['COCO', 'CLIC'])
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=2, num_workers=0)
+    # import matplotlib.pyplot as plt
+    # dataset = LoadImages(datasets=['COCO', 'CLIC400'])
+    # dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, num_workers=0)
+    # for imgs in tqdm(dataloader):
+    #     for im in imgs:
+    #         # im = im * dataset._input_std + dataset._input_mean
+    #         im = im.permute(1,2,0).numpy()
+    #         plt.imshow(im); plt.show()
 
-    import matplotlib.pyplot as plt
-    for imgs, labels in tqdm(dataloader):
-        # continue
-        for im, lbl in zip(imgs, labels):
-            im = im * dataset._input_std + dataset._input_mean
-            im = im.permute(1,2,0).numpy()
-            plt.imshow(im); plt.show()
-
-    # from mycv.models.cls.resnet import resnet50
-    # from mycv.paths import WEIGHTS_DIR
-    # model = resnet50(num_classes=1000)
-    # model.load_state_dict(torch.load(WEIGHTS_DIR / 'resnet50-19c8e357.pth'))
-    # model = model.cuda()
-    # model.eval()
-    # results = kodak_val(model, img_size=224, batch_size=64, workers=4, split='val200_600')
-    # print(results['top1'])
+    from mycv.models.nic.mini import IMCoding
+    from mycv.paths import WEIGHTS_DIR
+    model = IMCoding()
+    checkpoint = torch.load(WEIGHTS_DIR / 'miniMSE.pt')
+    model.load_state_dict(checkpoint['model'])
+    model = model.cuda()
+    model.eval()
+    results = kodak_val(model, input_norm=False)
+    print(results)
