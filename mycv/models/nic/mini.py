@@ -30,7 +30,8 @@ class IMCoding(nn.Module):
         if self.training:
             # noise = torch.rand_like(x) - 0.5
             # xq = x + noise
-            xq = UniverseQuant.apply(x)
+            # xq = UniverseQuant.apply(x)
+            xq = self.add_noise(x)
         else:
             xq = torch.round(x)
 
@@ -45,16 +46,27 @@ class IMCoding(nn.Module):
         xp1 = self.context(xq, hyper_dec) # 2GB
         return output, (xp1, xp2)
 
+    @staticmethod
+    def add_noise(x: torch.Tensor):
+        """ add noise for training
+
+        Args:
+            x (torch.Tensor): [description]
+        """        
+        b = torch.rand(1).item() * 2 - 1 # uniform [-1,1]
+        noise = (torch.rand_like(x) - 0.5) * (2**b) # uniform [-0.5 2**b, 0.5 2**b]
+        return torch.round(x + noise) - noise
+
     def encode(self, x):
-        ''' Encode only
-        '''
+        """ Encode only
+        """
         assert not self.training
         x, _ = self.encoder(x)
         return torch.round(x)
 
     def decode(self, x, ori_hw=None, return_type='tensor'):
-        ''' Reconstruct the original image from the feature
-        '''
+        """ Reconstruct the original image from the feature
+        """
         assert not self.training
         output = self.decoder(x)
         if ori_hw is not None:
@@ -74,8 +86,8 @@ class IMCoding(nn.Module):
 
 
 class miniEnc(nn.Module):
-    ''' mini NLAIC encoder
-    '''
+    """ mini NLAIC encoder
+    """
     def __init__(self, input_ch=3, channels=[32, 64, 128], hyper=False):
         super().__init__()
         c0, c1, c2 = channels
@@ -124,8 +136,8 @@ class miniEnc(nn.Module):
 
 
 class miniDec(nn.Module):
-    ''' mini NLAIC decoder
-    '''
+    """ mini NLAIC decoder
+    """
     def __init__(self, channels=[128, 64, 32, 16], input_features=3):
         super().__init__()
         c3, c2, c1, c0 = channels

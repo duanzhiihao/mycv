@@ -65,8 +65,9 @@ class UniverseQuant(torch.autograd.Function):
     def forward(ctx, x):
         b = np.random.uniform(-1, 1)
         #b = 0
-        uniform_distribution = Uniform(-0.5*torch.ones(x.size())*(2**b),
-                                       0.5*torch.ones(x.size())*(2**b)).sample().cuda()
+        uniform_distribution = Uniform(
+            -0.5*torch.ones(x.size())*(2**b), 0.5*torch.ones(x.size())*(2**b)
+        ).sample().to(device=x.device)
         return torch.round(x+uniform_distribution)-uniform_distribution
 
     @staticmethod
