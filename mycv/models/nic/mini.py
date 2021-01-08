@@ -28,10 +28,7 @@ class IMCoding(nn.Module):
 
         x, xp = self.encoder(x) # 3GB
         if self.training:
-            # noise = torch.rand_like(x) - 0.5
-            # xq = x + noise
-            # xq = UniverseQuant.apply(x)
-            xq = self.add_noise(x)
+            xq = UniverseQuant.apply(x)
         else:
             xq = torch.round(x)
 
@@ -45,17 +42,6 @@ class IMCoding(nn.Module):
         hyper_dec = self.p(x3)
         xp1 = self.context(xq, hyper_dec) # 2GB
         return output, (xp1, xp2)
-
-    @staticmethod
-    def add_noise(x: torch.Tensor):
-        """ add noise for training
-
-        Args:
-            x (torch.Tensor): [description]
-        """        
-        b = torch.rand(1).item() * 2 - 1 # uniform [-1,1]
-        noise = (torch.rand_like(x) - 0.5) * (2**b) # uniform [-0.5 2**b, 0.5 2**b]
-        return torch.round(x + noise) - noise
 
     def encode(self, x):
         """ Encode only

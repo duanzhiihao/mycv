@@ -63,8 +63,7 @@ class Non_local_Block(nn.Module):
 class UniverseQuant(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x):
-        b = np.random.uniform(-1, 1)
-        #b = 0
+        b = torch.rand(1).item() * 2 - 1
         uniform_distribution = Uniform(
             -0.5*torch.ones(x.size())*(2**b), 0.5*torch.ones(x.size())*(2**b)
         ).sample().to(device=x.device)

@@ -25,16 +25,16 @@ def train():
     parser.add_argument('--model',      type=str,  default='mini')
     parser.add_argument('--loss',       type=str,  default='mse', choices=['mse','msssim'])
     parser.add_argument('--resume',     type=str,  default='')
-    parser.add_argument('--batch_size', type=int,  default=64)
-    parser.add_argument('--amp',        type=bool, default=False)
-    parser.add_argument('--ema',        type=bool, default=False)
-    parser.add_argument('--optimizer',  type=str,  default='Adam', choices=['Adam', 'SGD'])
-    parser.add_argument('--epochs',     type=int,  default=100)
+    parser.add_argument('--batch_size', type=int,  default=128)
+    parser.add_argument('--amp',        type=bool, default=True)
+    parser.add_argument('--ema',        type=bool, default=True)
+    parser.add_argument('--optimizer',  type=str,  default='SGD', choices=['Adam', 'SGD'])
+    parser.add_argument('--epochs',     type=int,  default=80)
     parser.add_argument('--device',     type=int,  default=0)
     parser.add_argument('--workers',    type=int,  default=4)
     parser.add_argument('--local_rank', type=int,  default=-1, help='DDP arg, do not modify')
-    parser.add_argument('--dryrun',   type=bool, default=True)
-    # parser.add_argument('--dryrun',     action='store_true')
+    # parser.add_argument('--dryrun',   type=bool, default=True)
+    parser.add_argument('--dryrun',     action='store_true')
     cfg = parser.parse_args()
     # model
     cfg.img_size = 256
@@ -315,8 +315,9 @@ def train():
     # ----Training end
 
 
-def save_output(input_, output, log_dir):
-    imt, imp = input_[0].cpu(), output[0].detach().cpu()
+def save_output(input_: torch.Tensor, output: torch.Tensor, log_dir: Path):
+    imt, imp = input_[0].cpu(), output[0].detach().cpu().float()
+    imp.clamp_(min=0, max=1)
     assert imt.shape == imp.shape and imt.dim() == 3
     im = torch.cat([imt, imp], dim=2)
     im = im.permute(1,2,0) * 255
