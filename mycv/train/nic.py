@@ -3,7 +3,7 @@ from pathlib import Path
 import argparse
 from tqdm import tqdm
 import math
-import random
+import cv2
 import torch
 import torch.cuda.amp as amp
 from torch.optim.lr_scheduler import LambdaLR
@@ -12,6 +12,7 @@ import wandb
 
 from mycv.utils.general import increment_dir
 from mycv.utils.torch_utils import set_random_seeds, ModelEMA
+from mycv.utils.coding import MS_SSIM
 from mycv.datasets.loadimgs import LoadImages, kodak_val
 
 
@@ -20,32 +21,33 @@ def train():
     parser = argparse.ArgumentParser()
     parser.add_argument('--project',    type=str,  default='imcoding')
     parser.add_argument('--group',      type=str,  default='default')
+    parser.add_argument('--datasets',   type=str,  default=['NIC'], nargs='+')
     parser.add_argument('--model',      type=str,  default='mini')
     parser.add_argument('--loss',       type=str,  default='mse', choices=['mse','msssim'])
     parser.add_argument('--resume',     type=str,  default='')
-    parser.add_argument('--batch_size', type=int,  default=128)
-    parser.add_argument('--amp',        type=bool, default=True)
-    parser.add_argument('--ema',        type=bool, default=True)
-    parser.add_argument('--optimizer',  type=str,  default='SGD', choices=['Adam', 'SGD'])
+    parser.add_argument('--batch_size', type=int,  default=64)
+    parser.add_argument('--amp',        type=bool, default=False)
+    parser.add_argument('--ema',        type=bool, default=False)
+    parser.add_argument('--optimizer',  type=str,  default='Adam', choices=['Adam', 'SGD'])
     parser.add_argument('--epochs',     type=int,  default=100)
     parser.add_argument('--device',     type=int,  default=0)
     parser.add_argument('--workers',    type=int,  default=4)
     parser.add_argument('--local_rank', type=int,  default=-1, help='DDP arg, do not modify')
-    # parser.add_argument('--dryrun',   type=bool, default=True)
-    parser.add_argument('--dryrun',     action='store_true')
+    parser.add_argument('--dryrun',   type=bool, default=True)
+    # parser.add_argument('--dryrun',     action='store_true')
     cfg = parser.parse_args()
     # model
     cfg.img_size = 256
     cfg.input_norm = False
     cfg.sync_bn = False
     # optimizer
-    cfg.lr = 0.001
+    cfg.lr = 0.0001
     cfg.momentum = 0.9
     cfg.weight_decay = 0.0 # 0.0001
     cfg.nesterov = True
     # lr scheduler
     cfg.lrf = 0.2 # min lr factor
-    cfg.lr_warmup_epochs = 1
+    cfg.lr_warmup_epochs = 0
     # EMA
     cfg.ema_warmup_epochs = 2
     # Main process
@@ -83,12 +85,8 @@ def train():
     # Dataset
     if IS_MAIN:
         print('Initializing Datasets and Dataloaders...')
-    if cfg.group == 'default':
-        cfg.train_data = ['COCO', 'CLIC400']
-    else:
-        raise ValueError()
     # training set
-    trainset = LoadImages(datasets=cfg.train_data, img_size=cfg.img_size,
+    trainset = LoadImages(datasets=cfg.datasets, img_size=cfg.img_size,
                           input_norm=cfg.input_norm, verbose=IS_MAIN)
     sampler = torch.utils.data.distributed.DistributedSampler(
         trainset, num_replicas=world_size, rank=local_rank, shuffle=True
@@ -109,7 +107,7 @@ def train():
     if cfg.loss == 'mse':
         loss_func = torch.nn.MSELoss(reduction='mean')
     elif cfg.loss == 'msssim':
-        from mycv.utils.coding import MS_SSIM
+        raise NotImplementedError()
         loss_func = MS_SSIM(max_val=1.0, reduction='mean')
     else:
         raise ValueError()
@@ -199,22 +197,17 @@ def train():
 
     # Exponential moving average
     if IS_MAIN and cfg.ema:
-        emas = [
-            ModelEMA(model, decay=0.99),
-            ModelEMA(model, decay=0.999),
-            ModelEMA(model, decay=0.9999)
-        ]
+        ema = ModelEMA(model, decay=0.9999)
     else:
-        emas = None
+        ema = None
 
     # DDP mode
     if local_rank != -1:
         model = DDP(model, device_ids=[local_rank], output_device=local_rank)
 
-    if emas:
-        for ema in emas:
-            ema.updates = start_epoch * len(trainloader)  # set EMA updates
-            ema.warmup = cfg.ema_warmup_epochs * len(trainloader) # 4 epochs
+    if ema is not None:
+        ema.updates = start_epoch * len(trainloader)  # set EMA updates
+        ema.warmup = cfg.ema_warmup_epochs * len(trainloader) # 4 epochs
 
     # ======================== start training ========================
     niter = s = None
@@ -233,6 +226,7 @@ def train():
             print('\n' + pbar_title) # title
             pbar = tqdm(pbar, total=len(trainloader))
         for i, imgs in pbar:
+            niter = epoch * len(trainloader) + i
             imgs = imgs.to(device=device)
             # forward
             with amp.autocast(enabled=cfg.amp):
@@ -246,15 +240,16 @@ def train():
             scaler.step(optimizer)
             scaler.update()
             optimizer.zero_grad()
-            if emas:
-                for ema in emas:
-                    ema.update(model)
+            if ema is not None:
+                ema.update(model)
             # Scheduler
             scheduler.step()
 
+            # save output
+            if IS_MAIN and niter % 100 == 0:
+                save_output(imgs, rec, log_dir)
             # logging
             if IS_MAIN:
-                niter = epoch * len(trainloader) + i
                 cur_lr = optimizer.param_groups[0]['lr']
                 loss = loss.detach().cpu().item()
                 train_loss = (train_loss*i + loss) / (i+1)
@@ -270,63 +265,64 @@ def train():
                     wbrun.log({
                         'general/lr': cur_lr,
                         'metric/train_loss': train_loss,
-                        'ema/n_updates': emas[0].updates if emas is not None else 0,
-                        'ema0/decay': emas[0].get_decay() if emas is not None else 0,
-                        'ema1/decay': emas[1].get_decay() if emas is not None else 0,
-                        'ema2/decay': emas[2].get_decay() if emas is not None else 0,
+                        'ema/n_updates': ema.updates if ema is not None else 0,
+                        'ema2/decay': ema.get_decay() if ema is not None else 0,
                     }, step=niter)
                 # logging end
+            # Evaluation
+            if IS_MAIN and niter % 200 == 0:
+                _log_dic = {'general/epoch': epoch}
+                results = kodak_val(model, input_norm=cfg.input_norm, verbose=False)
+                _log_dic.update({'metric/plain_val_'+k: v for k,v in results.items()})
+                cur_fitness = results[metric]
+                _save_model = model
+                if ema is not None:
+                    results = kodak_val(ema.ema, input_norm=cfg.input_norm, verbose=False)
+                    _log_dic.update({f'metric/ema2_val_'+k: v for k,v in results.items()})
+                    # select best result among all emas
+                    ema_fitness = results[metric]
+                    if ema_fitness > cur_fitness:
+                        cur_fitness = ema_fitness
+                        _save_model = ema.ema
+                # wandb log
+                wbrun.log(_log_dic, step=niter)
+                # Write evaluation results
+                res = s + '||' + '%10.4g' * 2 % (results['psnr'], results['msssim'])
+                with open(log_dir / 'results.txt', 'a') as f:
+                    f.write(res + '\n')
+                # save last checkpoint
+                checkpoint = {
+                    'model'     : _save_model.state_dict(),
+                    'optimizer' : optimizer.state_dict(),
+                    'scaler'    : scaler.state_dict(),
+                    'epoch'     : epoch,
+                    metric      : cur_fitness,
+                }
+                torch.save(checkpoint, log_dir / 'last.pt')
+                # save best checkpoint
+                if cur_fitness > best_fitness:
+                    best_fitness = cur_fitness
+                    torch.save(checkpoint, log_dir / 'best.pt')
+                del checkpoint
+            model.train()
             # ----Mini batch end
         # ----Epoch end
         # If DDP mode, synchronize model parameters on all gpus
         if local_rank != -1:
             model._sync_params_and_buffers(authoritative_rank=0)
 
-        # Evaluation
-        if IS_MAIN:
-            # results is like {'top1': xxx, 'top5': xxx}
-            _log_dic = {'general/epoch': epoch}
-            results = kodak_val(model, input_norm=cfg.input_norm)
-            _log_dic.update({'metric/plain_val_'+k: v for k,v in results.items()})
-
-            res_emas = torch.zeros(len(emas))
-            if emas is not None:
-                for ei, ema in enumerate(emas):
-                    results = kodak_val(ema.ema, input_norm=cfg.input_norm)
-                    _log_dic.update({f'metric/ema{ei}_val_'+k: v for k,v in results.items()})
-                    res_emas[ei] = results[metric]
-                # select best result among all emas
-                _idx = torch.argmax(res_emas)
-                cur_fitness = res_emas[_idx]
-                _save_model = emas[_idx].ema
-                best_decay  = emas[_idx].final_decay
-            else:
-                cur_fitness = results[metric]
-                _save_model = model
-                best_decay  = 0
-            # wandb log
-            wbrun.log(_log_dic, step=niter)
-            # Write evaluation results
-            res = s + '||' + '%10.4g' * 1 % (results[metric])
-            with open(log_dir / 'results.txt', 'a') as f:
-                f.write(res + '\n')
-            # save last checkpoint
-            checkpoint = {
-                'model'     : _save_model.state_dict(),
-                'optimizer' : optimizer.state_dict(),
-                'scaler'    : scaler.state_dict(),
-                'epoch'     : epoch,
-                metric      : cur_fitness,
-                'best_decay': best_decay
-            }
-            torch.save(checkpoint, log_dir / 'last.pt')
-            # save best checkpoint
-            if cur_fitness > best_fitness:
-                best_fitness = cur_fitness
-                torch.save(checkpoint, log_dir / 'best.pt')
-            del checkpoint
         # ----Epoch end
     # ----Training end
+
+
+def save_output(input_, output, log_dir):
+    imt, imp = input_[0].cpu(), output[0].detach().cpu()
+    assert imt.shape == imp.shape and imt.dim() == 3
+    im = torch.cat([imt, imp], dim=2)
+    im = im.permute(1,2,0) * 255
+    im = im.to(dtype=torch.uint8).numpy()
+    im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
+    cv2.imwrite(str(log_dir / 'out.png'), im)
 
 
 if __name__ == '__main__':
