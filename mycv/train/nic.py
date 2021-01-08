@@ -12,31 +12,22 @@ import wandb
 
 from mycv.utils.general import increment_dir
 from mycv.utils.torch_utils import set_random_seeds, ModelEMA
-from mycv.datasets.imagenet import ImageNetCls, imagenet_val
-
-
-def cal_acc(p: torch.Tensor, labels: torch.LongTensor):
-    assert not p.requires_grad and p.device == labels.device
-    assert p.dim() == 2 and p.shape[0] == labels.shape[0]
-    _, p_cls = torch.max(p, dim=1)
-    tp = (p_cls == labels)
-    acc = tp.sum() / len(tp)
-    return acc
+from mycv.datasets.loadimgs import LoadImages, kodak_val
 
 
 def train():
     # ====== set the run settings ======
     parser = argparse.ArgumentParser()
-    parser.add_argument('--project',    type=str,  default='imagenet')
+    parser.add_argument('--project',    type=str,  default='imcoding')
     parser.add_argument('--group',      type=str,  default='default')
     parser.add_argument('--model',      type=str,  default='mini')
+    parser.add_argument('--loss',       type=str,  default='mse', choices=['mse','msssim'])
     parser.add_argument('--resume',     type=str,  default='')
     parser.add_argument('--batch_size', type=int,  default=128)
     parser.add_argument('--amp',        type=bool, default=True)
     parser.add_argument('--ema',        type=bool, default=True)
     parser.add_argument('--optimizer',  type=str,  default='SGD', choices=['Adam', 'SGD'])
     parser.add_argument('--epochs',     type=int,  default=100)
-    parser.add_argument('--metric',     type=str,  default='top1', choices=['top1'])
     parser.add_argument('--device',     type=int,  default=0)
     parser.add_argument('--workers',    type=int,  default=4)
     parser.add_argument('--local_rank', type=int,  default=-1, help='DDP arg, do not modify')
@@ -44,24 +35,25 @@ def train():
     parser.add_argument('--dryrun',     action='store_true')
     cfg = parser.parse_args()
     # model
-    cfg.img_size = 224
+    cfg.img_size = 256
+    cfg.input_norm = False
     cfg.sync_bn = False
     # optimizer
-    cfg.lr = 0.01
+    cfg.lr = 0.001
     cfg.momentum = 0.9
-    cfg.weight_decay = 0.0001
+    cfg.weight_decay = 0.0 # 0.0001
     cfg.nesterov = True
     # lr scheduler
     cfg.lrf = 0.2 # min lr factor
     cfg.lr_warmup_epochs = 1
     # EMA
-    # cfg.ema_decay = 0.999
     cfg.ema_warmup_epochs = 4
     # Main process
     IS_MAIN = (cfg.local_rank in [-1, 0])
 
     # check arguments
-    metric:     str = cfg.metric.lower()
+    _loss2metric = {'mse':'psnr', 'msssim':'msssim'}
+    metric:     str = _loss2metric[cfg.loss]
     epochs:     int = cfg.epochs
     local_rank: int = cfg.local_rank
     world_size: int = int(os.environ.get('WORLD_SIZE', 1))
@@ -92,15 +84,12 @@ def train():
     if IS_MAIN:
         print('Initializing Datasets and Dataloaders...')
     if cfg.group == 'default':
-        train_split = 'train'
-        val_split = 'val'
-        cfg.num_class = 1000
-    elif cfg.group == 'mini':
-        train_split = 'train200_600'
-        val_split = 'val200_600'
-        cfg.num_class = 200
+        cfg.train_data = ['COCO', 'CLIC400']
+    else:
+        raise ValueError()
     # training set
-    trainset = ImageNetCls(split=train_split, img_size=cfg.img_size)
+    trainset = LoadImages(datasets=cfg.train_data, img_size=cfg.img_size,
+                          input_norm=cfg.input_norm, verbose=IS_MAIN)
     sampler = torch.utils.data.distributed.DistributedSampler(
         trainset, num_replicas=world_size, rank=local_rank, shuffle=True
     ) if local_rank != -1 else None
@@ -110,20 +99,20 @@ def train():
     )
 
     # Initialize model
-    if cfg.model == 'res50':
-        from mycv.models.cls.resnet import resnet50
-        model = resnet50(num_classes=cfg.num_class)
-    elif cfg.model == 'res101':
-        from mycv.models.cls.resnet import resnet101
-        model = resnet101(num_classes=cfg.num_class)
-    elif cfg.model == 'yolov5l':
-        from mycv.models.yolov5.csp import YOLOv5Cls
-        model = YOLOv5Cls(model='l', num_class=cfg.num_class)
+    if cfg.model == 'mini':
+        from mycv.models.nic.mini import IMCoding
+        model = IMCoding(enable_bpp=False)
     else:
         raise NotImplementedError()
     model = model.to(device)
     # loss function
-    loss_func = torch.nn.CrossEntropyLoss(reduction='mean')
+    if cfg.loss == 'mse':
+        loss_func = torch.nn.MSELoss(reduction='mean')
+    elif cfg.loss == 'msssim':
+        from mycv.utils.coding import MS_SSIM
+        loss_func = MS_SSIM(max_val=1.0, reduction='mean')
+    else:
+        raise ValueError()
 
     # different optimization setting for different layers
     pgb, pgw = [], []
@@ -131,7 +120,7 @@ def train():
         if ('.bn' in k) or ('.bias' in k): # batchnorm or bias
             pgb.append(v)
         else: # conv weights
-            assert '.weight' in k
+            assert k.endswith('.weight')
             pgw.append(v)
     parameters = [
         {'params': pgb, 'lr': cfg.lr, 'weight_decay': 0.0},
@@ -146,10 +135,14 @@ def train():
         optimizer = torch.optim.SGD(parameters, lr=cfg.lr)
     elif cfg.optimizer == 'Adam':
         optimizer = torch.optim.Adam(parameters, lr=cfg.lr)
+    else:
+        raise ValueError()
     # AMP
     scaler = amp.GradScaler(enabled=cfg.amp)
 
     log_parent = Path(f'runs/{cfg.project}')
+    wb_id = None
+    results = {metric: 0}
     if cfg.resume:
         # resume
         run_name = cfg.resume
@@ -160,20 +153,18 @@ def train():
         optimizer.load_state_dict(checkpoint['optimizer'])
         scaler.load_state_dict(checkpoint['scaler'])
         start_epoch = checkpoint['epoch'] + 1
-        best_fitness = checkpoint.get(metric, 0)
+        cur_fitness = best_fitness = checkpoint.get(metric, 0)
         if IS_MAIN:
             wb_id = open(log_dir / 'wandb_id.txt', 'r').read()
     else:
         # new experiment
+        run_name = increment_dir(dir_root=log_parent, name=cfg.model)
+        log_dir = log_parent / run_name # wandb logging dir
         if IS_MAIN:
-            run_name = increment_dir(dir_root=log_parent, name=cfg.model)
-            log_dir = log_parent / run_name # wandb logging dir
             os.makedirs(log_dir, exist_ok=False)
             print(str(model), file=open(log_dir / 'model.txt', 'w'))
-            best_fitness = 0
-            results = {metric: 0}
-            wb_id = None
         start_epoch = 0
+        cur_fitness = best_fitness = 0
 
     # initialize wandb
     if cfg.dryrun:
@@ -187,6 +178,8 @@ def train():
         if not (log_dir / 'wandb_id.txt').exists():
             with open(log_dir / 'wandb_id.txt', 'w') as f:
                 f.write(wbrun.id)
+    else:
+        wbrun = None
 
     # lr scheduler
     def warmup_cosine(x):
@@ -224,6 +217,7 @@ def train():
             ema.warmup = cfg.ema_warmup_epochs * len(trainloader) # 4 epochs
 
     # ======================== start training ========================
+    niter = s = None
     for epoch in range(start_epoch, epochs):
         model.train()
         if local_rank != -1:
@@ -231,30 +225,19 @@ def train():
         optimizer.zero_grad()
 
         pbar = enumerate(trainloader)
+        train_loss = 0.0
         if IS_MAIN:
-            train_loss, train_acc = 0.0, 0.0
-            pbar_title = ('%-10s' * 6) % (
-                'Epoch', 'GPU_mem', 'lr', 'tr_loss', 'tr_acc', metric
+            pbar_title = ('%-10s' * 5) % (
+                'Epoch', 'GPU_mem', 'lr', f'tr_{cfg.loss}', metric
             )
             print('\n' + pbar_title) # title
             pbar = tqdm(pbar, total=len(trainloader))
-        for i, (imgs, labels) in pbar:
-            # debugging
-            # if True:
-            #     import matplotlib.pyplot as plt
-            #     from mycv.datasets.food101 import CLASS_NAMES
-            #     for im, lbl in zip(imgs, labels):
-            #         im = im * trainset._input_std + trainset._input_mean
-            #         im = im.permute(1,2,0).numpy()
-            #         print(CLASS_NAMES[lbl])
-            #         plt.imshow(im); plt.show()
+        for i, imgs in pbar:
             imgs = imgs.to(device=device)
-            labels = labels.to(device=device)
-
             # forward
             with amp.autocast(enabled=cfg.amp):
-                p = model(imgs)
-                loss = loss_func(p, labels) * imgs.shape[0]
+                rec, probs = model(imgs)
+                loss = loss_func(rec, imgs) * imgs.shape[0]
                 if local_rank != -1:
                     loss = loss * world_size
                 # loss is averaged within image, sumed over batch, and sumed over gpus
@@ -274,13 +257,11 @@ def train():
                 niter = epoch * len(trainloader) + i
                 cur_lr = optimizer.param_groups[0]['lr']
                 loss = loss.detach().cpu().item()
-                acc = cal_acc(p.detach(), labels)
                 train_loss = (train_loss*i + loss) / (i+1)
-                train_acc  = (train_acc*i + acc) / (i+1)
                 mem = torch.cuda.max_memory_allocated(device) / 1e9
-                s = ('%-10s' * 2 + '%-10.4g' * 4) % (
+                s = ('%-10s' * 2 + '%-10.4g' * 3) % (
                     f'{epoch}/{epochs-1}', f'{mem:.3g}G',
-                    cur_lr, train_loss, 100*train_acc, 100*results[metric]
+                    cur_lr, train_loss, cur_fitness
                 )
                 pbar.set_description(s)
                 torch.cuda.reset_peak_memory_stats()
@@ -289,7 +270,6 @@ def train():
                     wbrun.log({
                         'general/lr': cur_lr,
                         'metric/train_loss': train_loss,
-                        'metric/train_acc': train_acc,
                         'ema/n_updates': emas[0].updates if emas is not None else 0,
                         'ema0/decay': emas[0].get_decay() if emas is not None else 0,
                         'ema1/decay': emas[1].get_decay() if emas is not None else 0,
@@ -306,32 +286,43 @@ def train():
         if IS_MAIN:
             # results is like {'top1': xxx, 'top5': xxx}
             _log_dic = {'general/epoch': epoch}
-            results = imagenet_val(model, split=val_split, img_size=cfg.img_size,
-                        batch_size=batch_size, workers=cfg.workers)
+            results = kodak_val(model, input_norm=cfg.input_norm)
             _log_dic.update({'metric/plain_val_'+k: v for k,v in results.items()})
+
+            res_emas = torch.zeros(len(emas))
             if emas is not None:
                 for ei, ema in enumerate(emas):
-                    results = imagenet_val(ema.ema, split=val_split, img_size=cfg.img_size,
-                                batch_size=batch_size, workers=cfg.workers)
+                    results = kodak_val(model, input_norm=cfg.input_norm)
                     _log_dic.update({f'metric/ema{ei}_val_'+k: v for k,v in results.items()})
+                    res_emas[ei] = results[metric]
+                # select best result among all emas
+                _idx = torch.argmax(res_emas)
+                cur_fitness = res_emas[_idx]
+                _save_model = emas[_idx].ema
+                best_decay  = emas[_idx].final_decay
+            else:
+                cur_fitness = results[metric]
+                _save_model = model
+                best_decay  = 0
+            # wandb log
             wbrun.log(_log_dic, step=niter)
             # Write evaluation results
             res = s + '||' + '%10.4g' * 1 % (results[metric])
             with open(log_dir / 'results.txt', 'a') as f:
                 f.write(res + '\n')
             # save last checkpoint
-            _save_model = emas[1].ema if emas is not None else model
             checkpoint = {
-                'model'    : _save_model.state_dict(),
-                'optimizer': optimizer.state_dict(),
-                'scaler'   : scaler.state_dict(),
-                'epoch'    : epoch,
-                metric     : results[metric]
+                'model'     : _save_model.state_dict(),
+                'optimizer' : optimizer.state_dict(),
+                'scaler'    : scaler.state_dict(),
+                'epoch'     : epoch,
+                metric      : cur_fitness,
+                'best_decay': best_decay
             }
             torch.save(checkpoint, log_dir / 'last.pt')
             # save best checkpoint
-            if results[metric] > best_fitness:
-                best_fitness = results[metric]
+            if cur_fitness > best_fitness:
+                best_fitness = cur_fitness
                 torch.save(checkpoint, log_dir / 'best.pt')
             del checkpoint
         # ----Epoch end
