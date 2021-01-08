@@ -47,7 +47,7 @@ def train():
     cfg.lrf = 0.2 # min lr factor
     cfg.lr_warmup_epochs = 1
     # EMA
-    cfg.ema_warmup_epochs = 4
+    cfg.ema_warmup_epochs = 2
     # Main process
     IS_MAIN = (cfg.local_rank in [-1, 0])
 
@@ -292,7 +292,7 @@ def train():
             res_emas = torch.zeros(len(emas))
             if emas is not None:
                 for ei, ema in enumerate(emas):
-                    results = kodak_val(model, input_norm=cfg.input_norm)
+                    results = kodak_val(ema.ema, input_norm=cfg.input_norm)
                     _log_dic.update({f'metric/ema{ei}_val_'+k: v for k,v in results.items()})
                     res_emas[ei] = results[metric]
                 # select best result among all emas

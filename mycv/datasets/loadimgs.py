@@ -160,7 +160,7 @@ def kodak_val(model: torch.nn.Module, input_norm=None):
         output: torch.Tensor # should be between 0~1
         assert output.shape == input_.shape and output.dtype == input_.dtype
 
-        # MSSSIM
+        # MS-SSIM
         rec = output[:, :, :imh, :imw] # 0~1, float32
         tgt = input_[:, :, :imh, :imw]
         ms = msssim_func(rec, tgt).item()
