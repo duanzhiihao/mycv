@@ -51,15 +51,17 @@ def create_window(window_size, sigma, channel):
 
 
 class MS_SSIM(torch.nn.Module):
-    ''' https://github.com/lizhengwei1992/MS_SSIM_pytorch
+    ''' Adapted from https://github.com/lizhengwei1992/MS_SSIM_pytorch
     '''
-    def __init__(self, max_val=255):
+    def __init__(self, max_val=1.0, reduction='mean'):
         super(MS_SSIM, self).__init__()
         self.channel = 3
         self.max_val = max_val
         self.weight = torch.Tensor([0.0448, 0.2856, 0.3001, 0.2363, 0.1333])
+        assert reduction in {'mean'}, 'Invalid reduction'
+        self.reduction = reduction
 
-    def _ssim(self, img1, img2):
+    def _ssim(self, img1: torch.Tensor, img2: torch.Tensor):
         _, c, w, h = img1.size()
         window_size = min(w, h, 11)
         sigma = 1.5 * window_size / 11
@@ -89,12 +91,15 @@ class MS_SSIM(torch.nn.Module):
         V2 = sigma1_sq + sigma2_sq + C2
         ssim_map = ((2*mu1_mu2 + C1)*V1)/((mu1_sq + mu2_sq + C1)*V2)
         mcs_map = V1 / V2
-        return ssim_map.mean(), mcs_map.mean()
+        if self.reduction == 'mean':
+            ssim_map = ssim_map.mean()
+            mcs_map = mcs_map.mean()
+        return ssim_map, mcs_map
 
-    def forward(self, img1, img2, levels=5):
+    def forward(self, img1, img2):
         assert img1.device == img2.device
-        assert levels == 5
         self.weight = self.weight.to(device=img1.device)
+        levels = 5
 
         msssim = []
         mcs = []
