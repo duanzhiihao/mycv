@@ -1,7 +1,5 @@
 import os
-from pathlib import Path
 import json
-from tqdm import tqdm
 import cv2
 cv2.setNumThreads(0)
 cv2.ocl.setUseOpenCL(False)
@@ -17,7 +15,7 @@ def _get_imgpaths(datasets: list, verbose=True):
     """ get image paths
 
     Args:
-        datasets (list):
+        datasets (list): dataset names
         verbose (bool, optional): . Defaults to True.
     """
     img_paths = []
@@ -32,6 +30,7 @@ def _get_imgpaths(datasets: list, verbose=True):
             impath = str(COCO_DIR / 'train2017' / imgInfo['file_name'])
             img_paths.append(impath)
     if 'CLIC' in datasets:
+        raise DeprecationWarning()
         if verbose:
             print('Loading CLIC mobile and professional training set...')
         from mycv.paths import CLIC_DIR
@@ -50,24 +49,34 @@ def _get_imgpaths(datasets: list, verbose=True):
         for imname in img_names:
             impath = str(img_dir / imname)
             img_paths.append(impath)
-    if 'Kodak' in datasets:
-        raise NotImplementedError()
-    if 'imagenet' in datasets:
-        raise NotImplementedError()
+    if 'NIC' in datasets:
+        if verbose:
+            print('Loading NIC training set...')
+        NIC_DIR = 'D:/Datasets/NIC/train'
+        for s in ['Animal', 'Building', 'Mountain', 'Street']:
+            img_dir = NIC_DIR + '/' + s
+            img_names = os.listdir(img_dir)
+            for imname in img_names:
+                impath = img_dir + '/' + imname
+                img_paths.append(impath)
+    if 'imagenet200' in datasets:
+        if verbose:
+            print('Loading imagenet mini200 dataset...')
         from mycv.paths import ILSVRC_DIR
-        list_path = ILSVRC_DIR / 'ImageSets/CLS-LOC/train_cls.txt'
+        list_path = ILSVRC_DIR / 'ImageSets/CLS-LOC/train200_600.txt'
         img_dir = 'Data/CLS-LOC/train'
         assert list_path.exists(), f'Error: {list_path} does not exist.'
         lines = open(list_path, 'r').read().strip().split('\n')
         for l in lines:
             impath = str(ILSVRC_DIR / img_dir / l.split()[0]) + '.JPEG'
             img_paths.append(impath)
+    assert len(img_paths) > 0, 'No image path loaded'
     return img_paths
 
 
 class LoadImages(torch.utils.data.Dataset):
-    ''' Image loading dataset for image coding
-    '''
+    """ Image loading dataset for image coding
+    """
     def __init__(self, datasets=['COCO','CLIC'], img_size=256, input_norm=False,
                  verbose=True):
         assert isinstance(img_size, int)
@@ -102,7 +111,7 @@ class LoadImages(torch.utils.data.Dataset):
         assert imgUtils.is_image(im)
 
         # to tensor
-        im = torch.from_numpy(im).permute(2, 0, 1).float() / 255
+        im = torch.from_numpy(im).permute(2, 0, 1).float() / 255.0
         if self._input_norm:
             # normalize such that mean = 0 and std = 1
             im = (im - self._input_mean) / self._input_std
@@ -122,12 +131,15 @@ def _imread(img_path):
     return input_, im
 
 
-def kodak_val(model: torch.nn.Module, input_norm=None):
-    ''' Test on Kodak dataset
+def kodak_val(model: torch.nn.Module, input_norm=None, verbose=True):
+    """ Test on Kodak dataset
 
     Args:
-        model: torch model
-    '''
+        model (torch.nn.Module): torch model
+        input_norm (bool, optional): normalize input or not. Defaults to None.
+    """
+    if verbose:
+        print(f'Evaluating {type(model)} on Kodak dataset...')
     model.eval()
     device = next(model.parameters()).device
 
@@ -139,7 +151,7 @@ def kodak_val(model: torch.nn.Module, input_norm=None):
     # traverse the dataset
     msssim_func = MS_SSIM(max_val=1.0)
     psnr_all, msssim_all = [], []
-    for impath in tqdm(img_paths):
+    for impath in img_paths:
         # load image
         input_, im = _imread(impath)
         imh, imw = im.shape[:2]
@@ -187,8 +199,9 @@ def kodak_val(model: torch.nn.Module, input_norm=None):
 
 
 if __name__ == "__main__":
+    # from tqdm import tqdm
     # import matplotlib.pyplot as plt
-    # dataset = LoadImages(datasets=['COCO', 'CLIC400'])
+    # dataset = LoadImages(datasets=['NIC'])
     # dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, num_workers=0)
     # for imgs in tqdm(dataloader):
     #     for im in imgs:
