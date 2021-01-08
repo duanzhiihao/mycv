@@ -99,9 +99,10 @@ def scale(im: np.ndarray, size: int, side='shorter'):
     old_hw = im.shape[:2]
     if side == 'longer':
         ratio = size / max(old_hw[0], old_hw[1]) # Scale ratio (new / old)
-    else:
-        assert side == 'shorter'
+    elif side == 'shorter':
         ratio = size / min(old_hw[0], old_hw[1]) # Scale ratio (new / old)
+    else:
+        raise ValueError()
     if ratio != 1:
         new_h = round(old_hw[0] * ratio)
         new_w = round(old_hw[1] * ratio)

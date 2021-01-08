@@ -9,16 +9,17 @@ class ResBlock(nn.Module):
     '''
     Basic residual block
     '''
-    def __init__(self, inout, hidden, ks, s):
+    def __init__(self, inout, ks=3):
         super().__init__()
         pad = (ks - 1) // 2
-        self.conv1 = nn.Conv2d(inout, hidden, ks, s, padding=pad, padding_mode='reflect')
-        self.conv2 = nn.Conv2d(hidden, inout, ks, s, padding=pad, padding_mode='reflect')
+        hidden = inout
+        self.conv1 = nn.Conv2d(inout, hidden, ks, 1, padding=pad, padding_mode='reflect')
+        self.conv2 = nn.Conv2d(hidden, inout, ks, 1, padding=pad, padding_mode='reflect')
 
     def forward(self, x):
         x1 = tnf.relu(self.conv1(x), inplace=True)
         x1 = self.conv2(x1)
-        return x+x1
+        return x + x1
 
 
 # here use embedded gaussian
