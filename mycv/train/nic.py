@@ -28,7 +28,7 @@ def train():
     parser.add_argument('--batch_size', type=int,  default=128)
     parser.add_argument('--amp',        type=bool, default=True)
     parser.add_argument('--ema',        type=bool, default=True)
-    parser.add_argument('--optimizer',  type=str,  default='SGD', choices=['Adam', 'SGD'])
+    parser.add_argument('--optimizer',  type=str,  default='Adam', choices=['Adam', 'SGD'])
     parser.add_argument('--epochs',     type=int,  default=80)
     parser.add_argument('--device',     type=int,  default=0)
     parser.add_argument('--workers',    type=int,  default=4)
