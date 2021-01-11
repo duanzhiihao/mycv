@@ -8,6 +8,7 @@ wandb/
 # weights
 *.pt
 *.pth
+*.pkl
 *.ckpt
 
 # Byte-compiled / optimized / DLL files
