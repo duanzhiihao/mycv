@@ -97,7 +97,7 @@ class MS_SSIM(torch.nn.Module):
         return ssim_map, mcs_map
 
     def forward(self, img1, img2):
-        assert img1.device == img2.device
+        assert img1.shape == img2.shape and img1.device == img2.device
         self.weight = self.weight.to(device=img1.device)
         levels = 5
 

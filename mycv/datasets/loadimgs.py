@@ -106,8 +106,7 @@ class LoadImages(torch.utils.data.Dataset):
             im = imgUtils.scale(im, size=self.img_size, side='shorter')
         assert min(im.shape[:2]) >= self.img_size, f'{impath}, {im.shape}'
         im = augUtils.random_crop(im, crop_hw=(self.img_size,self.img_size))
-        if torch.rand(1).item() > 0.5:
-            im = cv2.flip(im, 1) # horizontal flip
+        im = self._random_aug(im) # random augmentation
         assert imgUtils.is_image(im)
 
         # to tensor
@@ -117,6 +116,18 @@ class LoadImages(torch.utils.data.Dataset):
             im = (im - self._input_mean) / self._input_std
 
         assert im.shape == (3, self.img_size, self.img_size)
+        return im
+
+    def _random_aug(self, im):
+        r = lambda: torch.rand(1).item()
+        if r() > 0.5:
+            im = cv2.flip(im, 1) # horizontal flip
+        if r() > 0.5:
+            im = cv2.flip(im, 0) # vertical flip
+        if r() > 0.5:
+            im = cv2.rotate(im, cv2.ROTATE_90_CLOCKWISE)
+        else:
+            im = cv2.rotate(im, cv2.ROTATE_90_COUNTERCLOCKWISE)
         return im
 
 
@@ -150,7 +161,7 @@ def kodak_val(model: torch.nn.Module, input_norm=None, verbose=True):
 
     # traverse the dataset
     msssim_func = MS_SSIM(max_val=1.0)
-    psnr_all, msssim_all = [], []
+    psnr_all, msssim_all, bpp_all = [], [], []
     for impath in img_paths:
         # load image
         input_, im = _imread(impath)
@@ -167,33 +178,40 @@ def kodak_val(model: torch.nn.Module, input_norm=None, verbose=True):
         # forward pass
         input_ = input_.unsqueeze(0).to(device=device)
         with torch.no_grad():
-            feat = model.encode(input_)
-            output = model.decode(feat)
-        output: torch.Tensor # should be between 0~1
-        assert output.shape == input_.shape and output.dtype == input_.dtype
+            fake, probs = model.inference(input_)
+            p1, p2 = probs
+        fake: torch.Tensor # should be between 0~1
+        assert fake.shape == input_.shape and fake.dtype == input_.dtype
 
         # MS-SSIM
-        rec = output[:, :, :imh, :imw] # 0~1, float32
-        tgt = input_[:, :, :imh, :imw]
-        ms = msssim_func(rec, tgt).item()
+        fake = fake[:, :, :imh, :imw] # 0~1, float32
+        real = input_[:, :, :imh, :imw]
+        ms = msssim_func(fake, real).item()
         # PSNR
-        rec = rec.cpu().squeeze(0).permute(1, 2, 0)
-        rec = (rec * 255).to(dtype=torch.uint8).numpy()
-        ps = psnr_dB(im, rec)
+        fake = fake.cpu().squeeze(0).permute(1, 2, 0)
+        fake = (fake * 255).to(dtype=torch.uint8).numpy()
+        ps = psnr_dB(im, fake)
+        if probs is not None:
+            bpp = cal_bpp(p1, imh*imw) + cal_bpp(p2, imh*imw)
+        else:
+            bpp = 0
         # if True: # debugging
         #     import matplotlib.pyplot as plt
         #     plt.figure(); plt.imshow(im)
-        #     plt.figure(); plt.imshow(rec); plt.show()
+        #     plt.figure(); plt.imshow(fake); plt.show()
         # recording
         msssim_all.append(ms)
         psnr_all.append(ps)
+        bpp_all.append(bpp)
     # average over all images
-    msssim = sum(msssim_all) / len(msssim_all)
-    psnr = sum(psnr_all) / len(psnr_all)
+    msssim = sum(msssim_all) / len(img_paths)
+    psnr   = sum(psnr_all) / len(img_paths)
+    bpp    = sum(bpp_all) / len(img_paths)
     results = {
         'psnr': psnr,
         'msssim': msssim,
-        # 'msssim_db': None
+        # 'msssim_db': None,
+        'bpp': bpp
     }
     return results
 

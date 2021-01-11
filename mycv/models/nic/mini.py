@@ -70,6 +70,12 @@ class IMCoding(nn.Module):
         else:
             raise NotImplementedError()
 
+    def inference(self, imgs):
+        assert not self.training
+        rec, probs = self.forward(imgs)
+        assert probs is None
+        return rec, probs
+
 
 class miniEnc(nn.Module):
     """ mini NLAIC encoder
