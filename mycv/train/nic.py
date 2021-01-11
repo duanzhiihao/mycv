@@ -25,8 +25,8 @@ def train():
     parser.add_argument('--model',      type=str,  default='nlaic')
     parser.add_argument('--loss',       type=str,  default='mse', choices=['mse','msssim'])
     parser.add_argument('--resume',     type=str,  default='')
-    parser.add_argument('--batch_size', type=int,  default=32)
-    parser.add_argument('--amp',        type=bool, default=False)
+    parser.add_argument('--batch_size', type=int,  default=12)
+    parser.add_argument('--amp',        type=bool, default=True)
     parser.add_argument('--ema',        type=bool, default=False)
     parser.add_argument('--optimizer',  type=str,  default='Adam', choices=['Adam', 'SGD'])
     parser.add_argument('--epochs',     type=int,  default=80)
@@ -43,7 +43,7 @@ def train():
     # optimizer
     cfg.lr = 0.0001
     cfg.momentum = 0.9
-    cfg.weight_decay = 0.0 # 0.0001
+    cfg.weight_decay = 0.0
     cfg.nesterov = True
     # lr scheduler
     cfg.lrf = 0.2 # min lr factor
@@ -100,7 +100,7 @@ def train():
     if cfg.model == 'mini':
         from mycv.models.nic.mini import MiniNIC
         model = MiniNIC(enable_bpp=False)
-    elif cfg.model == 'NLAIC':
+    elif cfg.model == 'nlaic':
         from mycv.models.nic.nlaic import NLAIC
         model = NLAIC(enable_bpp=True)
     else:
@@ -121,7 +121,7 @@ def train():
         if ('.bn' in k) or ('.bias' in k): # batchnorm or bias
             pgb.append(v)
         else: # conv weights
-            assert k.endswith('.weight')
+            # assert k.endswith('.weight')
             pgw.append(v)
     parameters = [
         {'params': pgb, 'lr': cfg.lr, 'weight_decay': 0.0},
@@ -223,9 +223,9 @@ def train():
         pbar = enumerate(trainloader)
         train_loss, train_rec, train_bpp = 0.0, 0.0, 0.0
         if IS_MAIN:
-            pbar_title = ('%-10s' * 7) % (
+            pbar_title = ('%-10s' * 8) % (
                 'Epoch', 'GPU_mem', 'lr',
-                f'tr_{cfg.loss}', 'tr_bpp', metric, 'bpp'
+                f'tr_{cfg.loss}', 'tr_bpp', 'loss', metric, 'bpp'
             )
             print('\n' + pbar_title) # title
             pbar = tqdm(pbar, total=len(trainloader))
@@ -263,9 +263,9 @@ def train():
             if IS_MAIN:
                 cur_lr = optimizer.param_groups[0]['lr']
                 loss = loss.detach().cpu().item()
+                train_rec  = (train_rec*i + l_rec/nB) / (i+1)
+                train_bpp  = (train_bpp*i + l_bpp/nB) / (i+1)
                 train_loss = (train_loss*i + loss/nB) / (i+1)
-                train_rec = (train_rec*i + l_rec/nB) / (i+1)
-                train_bpp = (train_bpp*i + l_bpp/nB) / (i+1)
                 mem = torch.cuda.max_memory_allocated(device) / 1e9
                 s = ('%-10s' * 2 + '%-10.4g' * 6) % (
                     f'{epoch}/{epochs-1}', f'{mem:.3g}G', cur_lr,
