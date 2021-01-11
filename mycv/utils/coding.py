@@ -32,6 +32,7 @@ def cal_bpp(prob: torch.Tensor, num_pixels: int):
     """
     assert isinstance(prob, torch.Tensor), 'Invalid input type'
     bpp = torch.sum(torch.log(prob)) / (-np.log(2) * num_pixels)
+    bpp: torch.Tensor
     return bpp
 
 

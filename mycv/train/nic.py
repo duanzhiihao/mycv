@@ -12,7 +12,7 @@ import wandb
 
 from mycv.utils.general import increment_dir
 from mycv.utils.torch_utils import set_random_seeds, ModelEMA
-from mycv.utils.coding import MS_SSIM
+from mycv.utils.coding import MS_SSIM, cal_bpp
 from mycv.datasets.loadimgs import LoadImages, kodak_val
 
 
@@ -21,13 +21,13 @@ def train():
     parser = argparse.ArgumentParser()
     parser.add_argument('--project',    type=str,  default='imcoding')
     parser.add_argument('--group',      type=str,  default='default')
-    parser.add_argument('--datasets',   type=str,  default=['NIC'], nargs='+')
-    parser.add_argument('--model',      type=str,  default='mini')
+    parser.add_argument('--datasets',   type=str,  default=['imagenet200'], nargs='+')
+    parser.add_argument('--model',      type=str,  default='nlaic')
     parser.add_argument('--loss',       type=str,  default='mse', choices=['mse','msssim'])
     parser.add_argument('--resume',     type=str,  default='')
-    parser.add_argument('--batch_size', type=int,  default=128)
-    parser.add_argument('--amp',        type=bool, default=True)
-    parser.add_argument('--ema',        type=bool, default=True)
+    parser.add_argument('--batch_size', type=int,  default=32)
+    parser.add_argument('--amp',        type=bool, default=False)
+    parser.add_argument('--ema',        type=bool, default=False)
     parser.add_argument('--optimizer',  type=str,  default='Adam', choices=['Adam', 'SGD'])
     parser.add_argument('--epochs',     type=int,  default=80)
     parser.add_argument('--device',     type=int,  default=0)
@@ -98,8 +98,11 @@ def train():
 
     # Initialize model
     if cfg.model == 'mini':
-        from mycv.models.nic.mini import IMCoding
-        model = IMCoding(enable_bpp=False)
+        from mycv.models.nic.mini import MiniNIC
+        model = MiniNIC(enable_bpp=False)
+    elif cfg.model == 'NLAIC':
+        from mycv.models.nic.nlaic import NLAIC
+        model = NLAIC(enable_bpp=True)
     else:
         raise NotImplementedError()
     model = model.to(device)
@@ -152,6 +155,7 @@ def train():
         scaler.load_state_dict(checkpoint['scaler'])
         start_epoch = checkpoint['epoch'] + 1
         cur_fitness = best_fitness = checkpoint.get(metric, 0)
+        cur_bpp = checkpoint.get('bpp', 0)
         if IS_MAIN:
             wb_id = open(log_dir / 'wandb_id.txt', 'r').read()
     else:
@@ -163,6 +167,7 @@ def train():
             print(str(model), file=open(log_dir / 'model.txt', 'w'))
         start_epoch = 0
         cur_fitness = best_fitness = 0
+        cur_bpp = 0
 
     # initialize wandb
     if cfg.dryrun:
@@ -198,16 +203,14 @@ def train():
     # Exponential moving average
     if IS_MAIN and cfg.ema:
         ema = ModelEMA(model, decay=0.9999)
+        ema.updates = start_epoch * len(trainloader)  # set EMA updates
+        ema.warmup = cfg.ema_warmup_epochs * len(trainloader) # 4 epochs
     else:
         ema = None
 
     # DDP mode
     if local_rank != -1:
         model = DDP(model, device_ids=[local_rank], output_device=local_rank)
-
-    if ema is not None:
-        ema.updates = start_epoch * len(trainloader)  # set EMA updates
-        ema.warmup = cfg.ema_warmup_epochs * len(trainloader) # 4 epochs
 
     # ======================== start training ========================
     niter = s = None
@@ -218,20 +221,28 @@ def train():
         optimizer.zero_grad()
 
         pbar = enumerate(trainloader)
-        train_loss = 0.0
+        train_loss, train_rec, train_bpp = 0.0, 0.0, 0.0
         if IS_MAIN:
-            pbar_title = ('%-10s' * 5) % (
-                'Epoch', 'GPU_mem', 'lr', f'tr_{cfg.loss}', metric
+            pbar_title = ('%-10s' * 7) % (
+                'Epoch', 'GPU_mem', 'lr',
+                f'tr_{cfg.loss}', 'tr_bpp', metric, 'bpp'
             )
             print('\n' + pbar_title) # title
             pbar = tqdm(pbar, total=len(trainloader))
         for i, imgs in pbar:
             niter = epoch * len(trainloader) + i
             imgs = imgs.to(device=device)
+            nB, nC, nH, nW = imgs.shape
             # forward
             with amp.autocast(enabled=cfg.amp):
                 rec, probs = model(imgs)
-                loss = loss_func(rec, imgs) * imgs.shape[0]
+                l_rec = loss_func(rec, imgs) * nB
+                if probs is not None:
+                    p1, p2 = probs
+                    l_bpp = cal_bpp(p1, nH*nW) + cal_bpp(p2, nH*nW)
+                else:
+                    l_bpp = torch.zeros(1).to(device=device)
+                loss = l_rec + 0.01 * l_bpp
                 if local_rank != -1:
                     loss = loss * world_size
                 # loss is averaged within image, sumed over batch, and sumed over gpus
@@ -252,11 +263,13 @@ def train():
             if IS_MAIN:
                 cur_lr = optimizer.param_groups[0]['lr']
                 loss = loss.detach().cpu().item()
-                train_loss = (train_loss*i + loss) / (i+1)
+                train_loss = (train_loss*i + loss/nB) / (i+1)
+                train_rec = (train_rec*i + l_rec/nB) / (i+1)
+                train_bpp = (train_bpp*i + l_bpp/nB) / (i+1)
                 mem = torch.cuda.max_memory_allocated(device) / 1e9
-                s = ('%-10s' * 2 + '%-10.4g' * 3) % (
-                    f'{epoch}/{epochs-1}', f'{mem:.3g}G',
-                    cur_lr, train_loss, cur_fitness
+                s = ('%-10s' * 2 + '%-10.4g' * 6) % (
+                    f'{epoch}/{epochs-1}', f'{mem:.3g}G', cur_lr,
+                    train_rec, train_bpp, train_loss, cur_fitness, cur_bpp
                 )
                 pbar.set_description(s)
                 torch.cuda.reset_peak_memory_stats()
@@ -264,6 +277,8 @@ def train():
                 if niter % 100 == 0:
                     wbrun.log({
                         'general/lr': cur_lr,
+                        'metric/train_rec': train_rec,
+                        'metric/train_bpp': train_bpp,
                         'metric/train_loss': train_loss,
                         'ema/n_updates': ema.updates if ema is not None else 0,
                         'ema2/decay': ema.get_decay() if ema is not None else 0,
@@ -274,7 +289,7 @@ def train():
                 _log_dic = {'general/epoch': epoch}
                 results = kodak_val(model, input_norm=cfg.input_norm, verbose=False)
                 _log_dic.update({'metric/plain_val_'+k: v for k,v in results.items()})
-                cur_fitness = results[metric]
+                cur_fitness, cur_bpp = results[metric], results['bpp']
                 _save_model = model
                 if ema is not None:
                     results = kodak_val(ema.ema, input_norm=cfg.input_norm, verbose=False)
@@ -282,7 +297,7 @@ def train():
                     # select best result among all emas
                     ema_fitness = results[metric]
                     if ema_fitness > cur_fitness:
-                        cur_fitness = ema_fitness
+                        cur_fitness, cur_bpp = ema_fitness, results['bpp']
                         _save_model = ema.ema
                 # wandb log
                 wbrun.log(_log_dic, step=niter)
