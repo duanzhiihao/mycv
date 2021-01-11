@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.distributions.uniform import Uniform
 
-from mycv.models.nic.basic_module import ResBlock, Non_local_Block, UniverseQuant
+from mycv.models.nic.basic_module import conv2d, ResBlock, Non_local_Block, UniverseQuant
 from mycv.models.nic.factorized_entropy_model import Entropy_bottleneck
 from mycv.models.nic.context_model import P_Model, Complex_context
 
@@ -14,7 +14,7 @@ class NLAIC(nn.Module):
 
     N1=192, N2=128, M=192, M1=96: 48.5M parameters
     '''
-    def __init__(self, enable_bpp=False):
+    def __init__(self, enable_bpp=True):
         super().__init__()
         input_channels = 3
         N1, N2, M, M1 = 192, 128, 192, 96
@@ -81,22 +81,22 @@ class Enc(nn.Module):
     def __init__(self, in_channels=3, N1=192, N2=128, M=192, M1=96,
                  enable_hyper=True):
         super().__init__()
-        self.conv1 = nn.Conv2d(in_channels, M1, 5, 1, 2)
+        self.conv1 = conv2d(in_channels, M1, 5, 1, 2)
         self.trunk1 = nn.Sequential(
             *[ResBlock(M1) for _ in range(2)],
-            nn.Conv2d(M1, 2*M1, 5, 2, 2)
+            conv2d(M1, 2*M1, 5, 2, 2)
         )
         self.trunk2 = nn.Sequential(
             *[ResBlock(2*M1) for _ in range(3)]
         )
-        self.down1 = nn.Conv2d(2*M1, M, 5, 2, 2)
+        self.down1 = conv2d(2*M1, M, 5, 2, 2)
         self.trunk3 = nn.Sequential(
             *[ResBlock(M) for _ in range(3)],
-            nn.Conv2d(M, M, 5, 2, 2)
+            conv2d(M, M, 5, 2, 2)
         )
         self.trunk4 = nn.Sequential(
             *[ResBlock(M) for _ in range(3)],
-            nn.Conv2d(M, M, 5, 2, 2)
+            conv2d(M, M, 5, 2, 2)
         )
         self.trunk5 = nn.Sequential(
             *[ResBlock(M) for _ in range(3)],
@@ -104,7 +104,7 @@ class Enc(nn.Module):
         self.mask2 = nn.Sequential(
             Non_local_Block(M, M // 2),
             *[ResBlock(M) for _ in range(3)],
-            nn.Conv2d(M, M, 1, 1, 0)
+            conv2d(M, M, 1, 1, 0)
         )
         self.enable_hyper = enable_hyper
         if not enable_hyper:
@@ -113,11 +113,11 @@ class Enc(nn.Module):
         # hyper
         self.trunk6 = nn.Sequential(
             *[ResBlock(M) for _ in range(2)],
-            nn.Conv2d(M, M, 5, 2, 2)
+            conv2d(M, M, 5, 2, 2)
         )
         self.trunk7 = nn.Sequential(
             *[ResBlock(M) for _ in range(2)],
-            nn.Conv2d(M, M, 5, 2, 2)
+            conv2d(M, M, 5, 2, 2)
         )
         self.trunk8 = nn.Sequential(
             *[ResBlock(M) for _ in range(3)],
@@ -125,9 +125,9 @@ class Enc(nn.Module):
         self.mask3 = nn.Sequential(
             Non_local_Block(M, M // 2),
             *[ResBlock(M) for _ in range(3)],
-            nn.Conv2d(M, M, 1, 1, 0)
+            conv2d(M, M, 1, 1, 0)
         )
-        self.conv2 = nn.Conv2d(M, N2, 3, 1, 1)
+        self.conv2 = conv2d(M, N2, 3, 1, 1)
 
     def forward(self, x):
         x = self.conv1(x)
@@ -137,12 +137,12 @@ class Enc(nn.Module):
         x = self.trunk3(x)
         x = self.trunk4(x)
         x_comp = self.trunk5(x) * torch.sigmoid(self.mask2(x)) + x
-        if self.enable_hyper:
+        if not self.enable_hyper:
             return x_comp, None
         # hyper
         x = self.trunk6(x_comp)
         x = self.trunk7(x)
-        x = self.trunk8(x)*torch.sigmoid(self.mask3(x)) + x
+        x = self.trunk8(x) * torch.sigmoid(self.mask3(x)) + x
         x_prob = self.conv2(x)
         return x_comp, x_prob
 
@@ -153,14 +153,14 @@ class Hyper_Dec(nn.Module):
     '''
     def __init__(self, in_ch=128, out_ch=192, nums=[3,3,2,2]):
         super(Hyper_Dec, self).__init__()
-        self.conv1 = nn.Conv2d(in_ch, out_ch, 3,1,1)
+        self.conv1 = conv2d(in_ch, out_ch, 3, 1, 1)
         self.trunk1 = nn.Sequential(
             *[ResBlock(out_ch) for _ in range(nums[0])],
         )
         self.mask1 = nn.Sequential(
             Non_local_Block(out_ch, out_ch // 2),
             *[ResBlock(out_ch) for _ in range(nums[1])],
-            nn.Conv2d(out_ch, out_ch, 1, 1, 0)
+            conv2d(out_ch, out_ch, 1, 1, 0)
         )
         self.trunk2 = nn.Sequential(
             *[ResBlock(out_ch) for _ in range(nums[2])],
@@ -194,7 +194,7 @@ class Dec(nn.Module):
         self.mask1 = nn.Sequential(
             Non_local_Block(self.M, self.M // 2),
             *[ResBlock(M) for _ in range(3)],
-            nn.Conv2d(self.M, self.M, 1, 1, 0)
+            conv2d(self.M, self.M, 1, 1, 0)
         )
         self.up1 = nn.ConvTranspose2d(M, M, 5, 2, 2, 1)
         self.trunk2 = nn.Sequential(
@@ -212,23 +212,28 @@ class Dec(nn.Module):
             nn.ConvTranspose2d(2*M1, M1, 5, 2, 2, 1),
             *[ResBlock(M1) for _ in range(3)]
         )
-        self.conv1 = nn.Conv2d(self.M1, self.input, 5, 1, 2)
+        self.conv1 = conv2d(self.M1, self.input, 5, 1, 2)
 
     def forward(self, x):
         x = self.trunk1(x) * torch.sigmoid(self.mask1(x)) + x
         x = self.up1(x)
         x = self.trunk2(x)
         x = self.trunk3(x)
-        x = self.trunk4(x)+x
+        x = self.trunk4(x) + x
         x = self.trunk5(x)
         x = self.conv1(x)
         return x
 
 
 if __name__ == "__main__":
+    from mycv.paths import WEIGHTS_DIR
+    from mycv.utils.torch_utils import load_partial
     model = NLAIC(enable_bpp=True)
-    print(sum(torch.numel(p) for p in model.parameters()), 'parameters')
+    # model.load_state_dict(torch.load(WEIGHTS_DIR/'NLAIC_xq_ms.pkl'))
+    load_partial(model, WEIGHTS_DIR/'NLAIC_xq_ms.pkl')
     model.eval()
     model = model.cuda()
 
     from mycv.datasets.loadimgs import kodak_val
+    results = kodak_val(model, input_norm=False)
+    print(results)

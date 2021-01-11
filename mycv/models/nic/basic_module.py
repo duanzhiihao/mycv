@@ -4,6 +4,12 @@ import torch.nn.functional as tnf
 from torch.distributions.uniform import Uniform
 
 
+def conv2d(in_channels: int, out_channels: int, kernel_size: int, stride=1,
+           padding=0):
+    return nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding,
+                     padding_mode='reflect')
+
+
 class ResBlock(nn.Module):
     '''
     Basic residual block
@@ -12,8 +18,8 @@ class ResBlock(nn.Module):
         super().__init__()
         pad = (ks - 1) // 2
         hidden = inout
-        self.conv1 = nn.Conv2d(inout, hidden, ks, 1, padding=pad, padding_mode='reflect')
-        self.conv2 = nn.Conv2d(hidden, inout, ks, 1, padding=pad, padding_mode='reflect')
+        self.conv1 = conv2d(inout, hidden, ks, 1, padding=pad)
+        self.conv2 = conv2d(hidden, inout, ks, 1, padding=pad)
 
     def forward(self, x):
         x1 = tnf.relu(self.conv1(x), inplace=True)
@@ -31,10 +37,10 @@ class Non_local_Block(nn.Module):
         super(Non_local_Block,self).__init__()
         self.in_channel = in_channel
         self.out_channel = out_channel
-        self.g = nn.Conv2d(self.in_channel,self.out_channel, 1, 1, 0)
-        self.theta = nn.Conv2d(self.in_channel, self.out_channel, 1, 1, 0)
-        self.phi = nn.Conv2d(self.in_channel, self.out_channel, 1, 1, 0)
-        self.W = nn.Conv2d(self.out_channel, self.in_channel, 1, 1, 0)
+        self.g = conv2d(self.in_channel,self.out_channel, 1, 1, 0)
+        self.theta = conv2d(self.in_channel, self.out_channel, 1, 1, 0)
+        self.phi = conv2d(self.in_channel, self.out_channel, 1, 1, 0)
+        self.W = conv2d(self.out_channel, self.in_channel, 1, 1, 0)
         nn.init.constant_(self.W.weight, 0)
         nn.init.constant_(self.W.bias, 0)
 

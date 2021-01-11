@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as f
 
-from mycv.models.nic.basic_module import ResBlock
+from mycv.models.nic.basic_module import conv2d, ResBlock
 from mycv.models.nic.gaussian_entropy_model import Distribution_for_entropy2
 
 
@@ -47,7 +47,7 @@ class Context(nn.Module):
 
         self.conv2 = nn.Sequential(nn.Conv3d(25,48,1,1,0),nn.ReLU(),nn.Conv3d(48,96,1,1,0),nn.ReLU(),
                                    nn.Conv3d(96,2,1,1,0))
-        self.conv3 = nn.Conv2d(384,192,3,1,1)
+        self.conv3 = conv2d(384,192,3,1,1)
 
         self.gaussin_entropy_func = Distribution_for_entropy2()
 
@@ -89,10 +89,10 @@ class Resblock_3D(nn.Module):
         self.stride = int(stride)
         self.padding = int(padding)
 
-        self.conv1 = nn.Conv3d(self.in_ch, self.out_ch, self.k, self.stride
-                               , self.padding)
-        self.conv2 = nn.Conv3d( self.in_ch, self.out_ch, self.k, self.stride
-                               , self.padding)
+        self.conv1 = nn.Conv3d(self.in_ch, self.out_ch, self.k, self.stride,
+                               self.padding)
+        self.conv2 = nn.Conv3d(self.in_ch, self.out_ch, self.k, self.stride,
+                               self.padding)
 
     def forward(self,x):
         x1 = self.conv2(f.relu(self.conv1(x)))
@@ -106,7 +106,7 @@ class Complex_context(nn.Module):
     '''
     def __init__(self, ch=192, nums=[4,3]):
         super(Complex_context, self).__init__()
-        self.hyper_to_main = nn.Conv2d(ch*2, ch, 3, 1, 1)
+        self.hyper_to_main = conv2d(ch*2, ch, 3, 1, 1)
         self.conv1 = MaskConv3d('A', 1, 24, 5, 1, 2)
         self.resblock1 = nn.Sequential(
             *[Maskb_resblock(24, 24, 3, 1, 1) for _ in range(nums[0])]
@@ -133,7 +133,7 @@ class P_Model(nn.Module):
         super(P_Model,self).__init__()
         self.context_p = nn.Sequential(
             *[ResBlock(ch) for _ in range(num)],
-            nn.Conv2d(ch, 2*ch, 3, 1, 1)
+            conv2d(ch, 2*ch, 3, 1, 1)
         )
 
     def forward(self,x):
