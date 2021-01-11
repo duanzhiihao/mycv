@@ -11,7 +11,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 import wandb
 
 from mycv.utils.general import increment_dir
-from mycv.utils.torch_utils import set_random_seeds, ModelEMA
+from mycv.utils.torch_utils import set_random_seeds, ModelEMA, is_parallel
 from mycv.utils.coding import MS_SSIM, cal_bpp
 from mycv.datasets.loadimgs import LoadImages, kodak_val
 
@@ -24,9 +24,10 @@ def train():
     parser.add_argument('--datasets',   type=str,  default=['imagenet200'], nargs='+')
     parser.add_argument('--model',      type=str,  default='nlaic')
     parser.add_argument('--loss',       type=str,  default='mse', choices=['mse','msssim'])
+    parser.add_argument('--lmbda',      type=float,default=32)
     parser.add_argument('--resume',     type=str,  default='')
     parser.add_argument('--batch_size', type=int,  default=12)
-    parser.add_argument('--amp',        type=bool, default=True)
+    parser.add_argument('--amp',        type=bool, default=False)
     parser.add_argument('--ema',        type=bool, default=False)
     parser.add_argument('--optimizer',  type=str,  default='Adam', choices=['Adam', 'SGD'])
     parser.add_argument('--epochs',     type=int,  default=80)
@@ -37,11 +38,11 @@ def train():
     parser.add_argument('--dryrun',     action='store_true')
     cfg = parser.parse_args()
     # model
-    cfg.img_size = 256
+    cfg.img_size = 192
     cfg.input_norm = False
     cfg.sync_bn = False
     # optimizer
-    cfg.lr = 0.0001
+    cfg.lr = 1e-5
     cfg.momentum = 0.9
     cfg.weight_decay = 0.0
     cfg.nesterov = True
@@ -242,7 +243,7 @@ def train():
                     l_bpp = cal_bpp(p1, nH*nW) + cal_bpp(p2, nH*nW)
                 else:
                     l_bpp = torch.zeros(1).to(device=device)
-                loss = l_rec + 0.01 * l_bpp
+                loss = cfg.lmbda * l_rec + 0.01 * l_bpp
                 if local_rank != -1:
                     loss = loss * world_size
                 # loss is averaged within image, sumed over batch, and sumed over gpus
@@ -287,7 +288,8 @@ def train():
             # Evaluation
             if IS_MAIN and niter % 200 == 0:
                 _log_dic = {'general/epoch': epoch}
-                results = kodak_val(model, input_norm=cfg.input_norm, verbose=False)
+                _val_model = model.module if is_parallel(model) else model
+                results = kodak_val(_val_model, input_norm=cfg.input_norm, verbose=False)
                 _log_dic.update({'metric/plain_val_'+k: v for k,v in results.items()})
                 cur_fitness, cur_bpp = results[metric], results['bpp']
                 _save_model = model
