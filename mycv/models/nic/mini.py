@@ -4,7 +4,7 @@ import torch.nn as nn
 from mycv.models.nic.basic_module import ResBlock, UniverseQuant
 
 
-class IMCoding(nn.Module):
+class MiniNIC(nn.Module):
     """
     docstring
     """
@@ -34,7 +34,7 @@ class IMCoding(nn.Module):
 
         output = self.decoder(xq) # 3GB
         if not self.enable_bpp:
-            return output, (None, None)
+            return output, None
 
         raise NotImplementedError()
         xq2, xp2 = self.factorized_entropy_func(xp, self.training)
@@ -165,3 +165,15 @@ class miniDec(nn.Module):
         x = self.up4(x) # 2.12 1.91
         x = self.cv1(x) # 2.12 1.95
         return x
+
+
+if __name__ == "__main__":
+    from mycv.paths import WEIGHTS_DIR
+    model = MiniNIC(enable_bpp=False)
+    model.load_state_dict(torch.load(WEIGHTS_DIR/'miniMSE.pt')['model'])
+    model.eval()
+    model = model.cuda()
+
+    from mycv.datasets.loadimgs import kodak_val
+    results = kodak_val(model, input_norm=False)
+    print(results)
