@@ -179,7 +179,6 @@ def kodak_val(model: torch.nn.Module, input_norm=None, verbose=True):
         input_ = input_.unsqueeze(0).to(device=device)
         with torch.no_grad():
             fake, probs = model.inference(input_)
-            p1, p2 = probs
         fake: torch.Tensor # should be between 0~1
         assert fake.shape == input_.shape and fake.dtype == input_.dtype
 
@@ -191,8 +190,11 @@ def kodak_val(model: torch.nn.Module, input_norm=None, verbose=True):
         fake = fake.cpu().squeeze(0).permute(1, 2, 0)
         fake = (fake * 255).to(dtype=torch.uint8).numpy()
         ps = psnr_dB(im, fake)
+        # Bpp
         if probs is not None:
+            p1, p2 = probs
             bpp = cal_bpp(p1, imh*imw) + cal_bpp(p2, imh*imw)
+            bpp = bpp.item()
         else:
             bpp = 0
         # if True: # debugging
@@ -227,9 +229,9 @@ if __name__ == "__main__":
     #         im = im.permute(1,2,0).numpy()
     #         plt.imshow(im); plt.show()
 
-    from mycv.models.nic.mini import IMCoding
+    from mycv.models.nic.mini import MiniNIC
     from mycv.paths import WEIGHTS_DIR
-    model = IMCoding()
+    model = MiniNIC()
     checkpoint = torch.load(WEIGHTS_DIR / 'miniMSE.pt')
     model.load_state_dict(checkpoint['model'])
     model = model.cuda()
