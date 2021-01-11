@@ -132,7 +132,7 @@ class P_Model(nn.Module):
     def __init__(self, ch, num=3):
         super(P_Model,self).__init__()
         self.context_p = nn.Sequential(
-            *[ResBlock(ch, ch, 3, 1, 1) for _ in range(num)],
+            *[ResBlock(ch) for _ in range(num)],
             nn.Conv2d(ch, 2*ch, 3, 1, 1)
         )
 

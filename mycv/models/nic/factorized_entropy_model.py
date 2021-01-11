@@ -25,7 +25,7 @@ class Low_bound(torch.autograd.Function):
 class Entropy_bottleneck(nn.Module):
     def __init__(self, channel, init_scale=10, filters = (3,3,3), likelihood_bound=1e-6,
                  tail_mass=1e-9, optimize_integer_offset=True):
-        super(Entropy_bottleneck,self).__init__()
+        super(Entropy_bottleneck, self).__init__()
 
         self.filters = tuple(int(t) for t in filters)
         self.init_scale = float(init_scale)
@@ -68,7 +68,6 @@ class Entropy_bottleneck(nn.Module):
 
     def _logits_cumulative(self,logits,stop_gradient):
         for i in range(len(self.filters) + 1):
-
             matrix = f.softplus(self._matrices[i])
             if stop_gradient:
                 matrix = matrix.detach()
@@ -91,14 +90,12 @@ class Entropy_bottleneck(nn.Module):
         noise = torch.Tensor(noise).cuda()
         return x + noise
 
-    def forward(self, x,training):
+    def forward(self, x):
         x = x.permute(1,0,2,3).contiguous()
         shape = x.size()
         x = x.view(shape[0],1,-1)
-        if training==0:
-            x = self.add_noise(x)
-        elif training==1:
-            x = UniverseQuant.apply(x)
+        if self.training:
+            x = _UniverseQuant.apply(x)
         else:
             x = torch.round(x)
         lower = self._logits_cumulative(x - 0.5, stop_gradient=False)
@@ -118,12 +115,14 @@ class Entropy_bottleneck(nn.Module):
         return x, likelihood
 
 
-class UniverseQuant(torch.autograd.Function):
+class _UniverseQuant(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x):
         #b = np.random.uniform(-1,1)
         b = 0
-        uniform_distribution = Uniform(-0.5*torch.ones(x.size())*(2**b),0.5*torch.ones(x.size())*(2**b)).sample().cuda()
+        uniform_distribution = Uniform(
+            -0.5*torch.ones(x.size())*(2**b), 0.5*torch.ones(x.size())*(2**b)
+        ).sample().cuda()
         return torch.round(x+uniform_distribution)-uniform_distribution
     @staticmethod
     def backward(ctx, g):
