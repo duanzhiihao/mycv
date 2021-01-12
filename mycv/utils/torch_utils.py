@@ -5,7 +5,6 @@ import random
 import numpy as np
 import torch
 import torch.nn as nn
-import torchvision as tv
 
 
 def set_random_seeds(random_seed=0):
@@ -22,6 +21,17 @@ def num_params(model: nn.Module):
     """    
     num = sum([p.numel() for p in model.parameters()])
     return num
+
+
+def summary_weights(state_dict: OrderedDict, save_path='model.txt'):
+    if not isinstance(state_dict, OrderedDict):
+        print('Warning: state_dict is not a OrderedDict. keys may not be ordered.')
+    if Path(save_path).exists():
+        print(f'Warning: overwriting {save_path}')
+    with open(save_path, 'w') as f:
+        for k, v in state_dict.items():
+            line = f'{k:<48s}{v.shape}'
+            print(line, file=f)
 
 
 def load_partial(model, weights, verbose=True):
