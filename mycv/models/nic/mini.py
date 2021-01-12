@@ -1,7 +1,9 @@
 import torch
 import torch.nn as nn
 
-from mycv.models.nic.basic_module import ResBlock, UniverseQuant
+from mycv.models.nic.basic_module import conv2d, ResBlock, UniverseQuant
+from mycv.models.nic.factorized_entropy_model import Entropy_bottleneck
+from mycv.models.nic.context_model import P_Model, Complex_context
 
 
 class MiniNIC(nn.Module):
@@ -16,11 +18,10 @@ class MiniNIC(nn.Module):
         self.enable_bpp = enable_bpp
         if not enable_bpp:
             return
-        raise NotImplementedError()
-        # self.factorized_entropy_func = Entropy_bottleneck(96) # 4.1k
-        # self.hyper_dec = Hyper_Dec(96, 128, nums=[2,2,1,1]) # 2.7M
-        # self.p = P_Model(128, num=2) # 885k
-        # self.context = Complex_context(ch=128, nums=[3,2]) # 402k
+        self.factorized_entropy_func = Entropy_bottleneck(96) # 4.1k
+        self.hyper_dec = Hyper_Dec(96, 128, nums=[2,2,1,1]) # 2.7M
+        self.p = P_Model(128, num=2) # 885k
+        self.context = Complex_context(ch=128, nums=[3,2]) # 402k
 
     def forward(self, x):
         assert x.dim() == 4 and x.shape[1] == 3
@@ -36,8 +37,7 @@ class MiniNIC(nn.Module):
         if not self.enable_bpp:
             return output, None
 
-        raise NotImplementedError()
-        xq2, xp2 = self.factorized_entropy_func(xp, self.training)
+        xq2, xp2 = self.factorized_entropy_func(xp)
         x3 = self.hyper_dec(xq2)
         hyper_dec = self.p(x3)
         xp1 = self.context(xq, hyper_dec) # 2GB
@@ -73,7 +73,6 @@ class MiniNIC(nn.Module):
     def inference(self, imgs):
         assert not self.training
         rec, probs = self.forward(imgs)
-        assert probs is None
         return rec, probs
 
 
@@ -86,35 +85,34 @@ class miniEnc(nn.Module):
         self.hyper = hyper
 
         self.trunk = nn.Sequential(
-            nn.Conv2d(input_ch, c0, 5, 2, padding=2, padding_mode='reflect'),
+            conv2d(input_ch, c0, 5, 2, padding=2),
             # 2x
             *[ResBlock(c0) for _ in range(2)],
-            nn.Conv2d(c0, c1, 5, 2, padding=2, padding_mode='reflect'),
+            conv2d(c0, c1, 5, 2, padding=2),
             # 4x
             *[ResBlock(c1) for _ in range(2)],
-            nn.Conv2d(c1, c2, 5, 2, padding=2, padding_mode='reflect'),
+            conv2d(c1, c2, 5, 2, padding=2),
             # 8x
             *[ResBlock(c2) for _ in range(3)],
-            nn.Conv2d(c2, c2, 5, 2, padding=2, padding_mode='reflect'),
+            conv2d(c2, c2, 5, 2, padding=2),
             # 16x
             *[ResBlock(c2) for _ in range(3)],
         )
         if not hyper:
             return
-        raise NotImplementedError()
         # hyper
         self.trunk6 = nn.Sequential(
             *[ResBlock(c2) for _ in range(2)],
-            nn.Conv2d(c2, c2, 5, 2, 2, padding_mode='reflect')
+            conv2d(c2, c2, 5, 2, 2)
         )
         self.trunk7 = nn.Sequential(
             *[ResBlock(c2) for _ in range(3)],
-            nn.Conv2d(c2, c2, 5, 2, 2, padding_mode='reflect')
+            conv2d(c2, c2, 5, 2, 2)
         )
         self.trunk8 = nn.Sequential(
             *[ResBlock(c2) for _ in range(3)],
         )
-        self.conv2 = nn.Conv2d(c2, 96, 3, 1, 1, padding_mode='reflect')
+        self.conv2 = conv2d(c2, 96, 3, 1, 1)
 
     def forward(self, x):
         x_comp = self.trunk(x)
@@ -152,7 +150,7 @@ class miniDec(nn.Module):
             nn.ConvTranspose2d(c1, c0, 3, 2, 1, 1),
             *[ResBlock(c0) for _ in range(1)],
         )
-        self.cv1 = nn.Conv2d(c0, input_features, 5, 1, 2, padding_mode='reflect')
+        self.cv1 = conv2d(c0, input_features, 5, 1, 2)
 
         self._feat_ch = c3
 
@@ -167,10 +165,51 @@ class miniDec(nn.Module):
         return x
 
 
+class Hyper_Dec(nn.Module):
+    '''
+    Hyper decoder
+    '''
+    def __init__(self, in_ch=128, out_ch=192, nums=[3,3,2,2]):
+        super(Hyper_Dec, self).__init__()
+        self.conv1 = nn.Conv2d(in_ch, out_ch, 3,1,1)
+        self.trunk1 = nn.Sequential(
+            *[ResBlock(out_ch) for _ in range(nums[0])],
+        )
+        # self.mask1 = nn.Sequential(
+        #     Non_local_Block(out_ch, out_ch // 2),
+        #     *[ResBlock(out_ch) for _ in range(nums[1])],
+        #     nn.Conv2d(out_ch, out_ch, 1, 1, 0)
+        # )
+        self.trunk2 = nn.Sequential(
+            *[ResBlock(out_ch) for _ in range(nums[2])],
+            nn.ConvTranspose2d(out_ch, out_ch, 5, 2, 2, 1)
+        )
+        self.trunk3 = nn.Sequential(
+            *[ResBlock(out_ch) for _ in range(nums[3])],
+            nn.ConvTranspose2d(out_ch, out_ch, 5, 2, 2, 1)
+        )
+
+    def forward(self, x):
+        x = self.conv1(x)
+        # x = self.trunk1(x) * torch.sigmoid(self.mask1(x)) + x
+        x = self.trunk1(x)
+        x = self.trunk2(x)
+        x = self.trunk3(x)
+        return x
+
+
 if __name__ == "__main__":
     from mycv.paths import WEIGHTS_DIR
-    model = MiniNIC(enable_bpp=False)
-    model.load_state_dict(torch.load(WEIGHTS_DIR/'miniMSE.pt')['model'])
+    model = MiniNIC(enable_bpp=True)
+    # model.load_state_dict(torch.load(WEIGHTS_DIR/'miniMSE.pt')['model'])
+
+    from mycv.utils.torch_utils import summary_weights
+    summary_weights(model.state_dict(), save_path='model.txt')
+
+    checkpoint = torch.load('C:/Projects/yolov5/runs/nic/mini9_v1/weights/last.pt')
+    summary_weights(checkpoint['model'], save_path='mini9.txt')
+
+    model.load_state_dict(checkpoint['model'])
     model.eval()
     model = model.cuda()
 
