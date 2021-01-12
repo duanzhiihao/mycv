@@ -1,9 +1,10 @@
+from mycv.utils.general import disable_multithreads
+disable_multithreads()
 import os
 from pathlib import Path
 import argparse
 from tqdm import tqdm
 import math
-import random
 import torch
 import torch.cuda.amp as amp
 from torch.optim.lr_scheduler import LambdaLR
@@ -51,7 +52,7 @@ def train():
     cfg.lr = 0.01
     cfg.momentum = 0.9
     cfg.weight_decay = 0.0001
-    cfg.nesterov = True
+    cfg.nesterov = False
     # lr scheduler
     cfg.lrf = 0.2 # min lr factor
     cfg.lr_warmup_epochs = 1
@@ -157,7 +158,8 @@ def train():
 
     # optimizer
     if cfg.optimizer == 'SGD':
-        optimizer = torch.optim.SGD(parameters, lr=cfg.lr)
+        optimizer = torch.optim.SGD(parameters, lr=cfg.lr,
+                                    momentum=cfg.momentum, nesterov=cfg.nesterov)
     elif cfg.optimizer == 'Adam':
         optimizer = torch.optim.Adam(parameters, lr=cfg.lr)
     else:

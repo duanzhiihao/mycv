@@ -1,3 +1,5 @@
+from mycv.utils.general import disable_multithreads
+disable_multithreads()
 import os
 from pathlib import Path
 import argparse
@@ -22,13 +24,13 @@ def train():
     parser.add_argument('--project',    type=str,  default='imcoding')
     parser.add_argument('--group',      type=str,  default='default')
     parser.add_argument('--datasets',   type=str,  default=['imagenet200'], nargs='+')
-    parser.add_argument('--model',      type=str,  default='nlaic')
+    parser.add_argument('--model',      type=str,  default='mini')
     parser.add_argument('--loss',       type=str,  default='mse', choices=['mse','msssim'])
     parser.add_argument('--lmbda',      type=float,default=32)
     parser.add_argument('--resume',     type=str,  default='')
-    parser.add_argument('--batch_size', type=int,  default=12)
+    parser.add_argument('--batch_size', type=int,  default=64)
     parser.add_argument('--amp',        type=bool, default=False)
-    parser.add_argument('--ema',        type=bool, default=False)
+    parser.add_argument('--ema',        type=bool, default=True)
     parser.add_argument('--optimizer',  type=str,  default='Adam', choices=['Adam', 'SGD'])
     parser.add_argument('--epochs',     type=int,  default=80)
     parser.add_argument('--device',     type=int,  default=0)
@@ -100,7 +102,7 @@ def train():
     # Initialize model
     if cfg.model == 'mini':
         from mycv.models.nic.mini import MiniNIC
-        model = MiniNIC(enable_bpp=False)
+        model = MiniNIC(enable_bpp=True)
     elif cfg.model == 'nlaic':
         from mycv.models.nic.nlaic import NLAIC
         model = NLAIC(enable_bpp=True)
