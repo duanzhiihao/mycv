@@ -1,8 +1,6 @@
 import os
 import json
 import cv2
-cv2.setNumThreads(0)
-cv2.ocl.setUseOpenCL(False)
 import torch
 
 import mycv.utils.image as imgUtils

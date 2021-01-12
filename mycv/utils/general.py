@@ -27,6 +27,18 @@ def increment_dir(dir_root='runs/', name='exp'):
     return name
 
 
+def disable_multithreads():
+    """ Disable multi-processing in numpy and cv2
+    """    
+    os.environ["OMP_NUM_THREADS"]      = "1" # export OMP_NUM_THREADS=4
+    os.environ["OPENBLAS_NUM_THREADS"] = "1" # export OPENBLAS_NUM_THREADS=4 
+    os.environ["MKL_NUM_THREADS"]      = "1" # export MKL_NUM_THREADS=6
+    os.environ["NUMEXPR_NUM_THREADS"]  = "1" # export NUMEXPR_NUM_THREADS=6
+    import cv2
+    cv2.setNumThreads(0)
+    cv2.ocl.setUseOpenCL(False)
+
+
 # def wb_increment_id(dir_root='wandb/', name='exp'):
 #     """ Increament wandb run name. E.g., xxx-exp1, yyy-exp2, zzz-exp3, ...
 #     """

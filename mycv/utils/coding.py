@@ -1,4 +1,3 @@
-from matplotlib.pyplot import isinteractive
 import numpy as np
 import torch
 import torch.nn.functional as tnf
@@ -36,15 +35,15 @@ def cal_bpp(prob: torch.Tensor, num_pixels: int):
     return bpp
 
 
-def gaussian(window_size, sigma):
+def _gaussian(window_size, sigma):
     gauss = torch.Tensor(
         [np.exp(-(x - window_size//2)**2 / float(2*sigma**2)) for x in range(window_size)]
     )
     return gauss/gauss.sum()
 
 
-def create_window(window_size, sigma, channel):
-    _1D_window = gaussian(window_size, sigma).unsqueeze(1)
+def _create_window(window_size, sigma, channel):
+    _1D_window = _gaussian(window_size, sigma).unsqueeze(1)
     _2D_window = _1D_window.mm(
         _1D_window.t()).float().unsqueeze(0).unsqueeze(0)
     window = _2D_window.expand(channel, 1, window_size, window_size).contiguous()
@@ -67,7 +66,7 @@ class MS_SSIM(torch.nn.Module):
         window_size = min(w, h, 11)
         sigma = 1.5 * window_size / 11
 
-        window = create_window(window_size, sigma, self.channel)
+        window = _create_window(window_size, sigma, self.channel)
         window = window.to(device=img1.device)
 
         mu1 = tnf.conv2d(img1, window, padding=window_size //
