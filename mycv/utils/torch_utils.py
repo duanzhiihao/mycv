@@ -1,6 +1,7 @@
 from pathlib import Path
 from copy import deepcopy
 from collections import OrderedDict
+import math
 import random
 import numpy as np
 import torch
@@ -96,6 +97,15 @@ def initialize_weights(model):
             m.momentum = 0.03
         elif t in [nn.LeakyReLU, nn.ReLU, nn.ReLU6]:
             m.inplace = True
+
+
+def warmup_cosine(n, min_lrf, warmup_iter, total_iter):
+    if n < warmup_iter:
+        factor = n / warmup_iter
+    else:
+        _cur = n - warmup_iter + 1
+        factor = min_lrf + 0.5 * (1 - min_lrf) * (1 + math.cos(_cur * math.pi / total_iter))
+    return factor
 
 
 def fuse_conv_and_bn(conv, bn):
