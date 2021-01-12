@@ -7,7 +7,7 @@ from torch.distributions.uniform import Uniform
 def conv2d(in_channels: int, out_channels: int, kernel_size: int, stride=1,
            padding=0):
     return nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding,
-                     padding_mode='reflect')
+                     padding_mode='zeros')
 
 
 class ResBlock(nn.Module):
