@@ -1,5 +1,7 @@
 import os
+from tqdm import tqdm
 import json
+from math import log10
 import cv2
 import torch
 
@@ -120,12 +122,12 @@ class LoadImages(torch.utils.data.Dataset):
         r = lambda: torch.rand(1).item()
         if r() > 0.5:
             im = cv2.flip(im, 1) # horizontal flip
-        if r() > 0.5:
-            im = cv2.flip(im, 0) # vertical flip
-        if r() > 0.5:
-            im = cv2.rotate(im, cv2.ROTATE_90_CLOCKWISE)
-        else:
-            im = cv2.rotate(im, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        # if r() > 0.5:
+        #     im = cv2.flip(im, 0) # vertical flip
+        # if r() > 0.5:
+        #     im = cv2.rotate(im, cv2.ROTATE_90_CLOCKWISE)
+        # else:
+        #     im = cv2.rotate(im, cv2.ROTATE_90_COUNTERCLOCKWISE)
         return im
 
 
@@ -140,7 +142,7 @@ def _imread(img_path):
     return input_, im
 
 
-def kodak_val(model: torch.nn.Module, input_norm=None, verbose=True):
+def kodak_val(model: torch.nn.Module, input_norm=None, verbose=True, bar=False):
     """ Test on Kodak dataset
 
     Args:
@@ -156,11 +158,13 @@ def kodak_val(model: torch.nn.Module, input_norm=None, verbose=True):
     from mycv.paths import KODAK_DIR
     img_names = os.listdir(KODAK_DIR)
     img_paths = [str(KODAK_DIR / imname) for imname in img_names]
+    img_paths.sort()
 
     # traverse the dataset
     msssim_func = MS_SSIM(max_val=1.0)
     psnr_all, msssim_all, bpp_all = [], [], []
-    for impath in img_paths:
+    pbar = tqdm(img_paths) if bar else img_paths
+    for impath in pbar:
         # load image
         input_, im = _imread(impath)
         imh, imw = im.shape[:2]
@@ -210,7 +214,7 @@ def kodak_val(model: torch.nn.Module, input_norm=None, verbose=True):
     results = {
         'psnr': psnr,
         'msssim': msssim,
-        # 'msssim_db': None,
+        'msssim_db': -10*log10(1-msssim),
         'bpp': bpp
     }
     return results

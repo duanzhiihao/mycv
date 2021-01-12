@@ -37,6 +37,9 @@ def random_crop(im: np.ndarray, crop_hw: tuple):
     ''' random crop
     '''
     assert imgUtils.is_image(im)
+    if im.shape[:2] == crop_hw:
+        return im
+
     height, width = im.shape[:2]
     ch, cw = crop_hw
     y1 = random.randint(0, height-ch)
