@@ -8,18 +8,18 @@ from mycv.models.nic.context_model import P_Model, Complex_context
 
 class MiniNIC(nn.Module):
     """
-    docstring
+    10.4M parameters
     """
     def __init__(self, enable_bpp=False):
         super().__init__()
-        self.encoder = miniEnc(hyper=enable_bpp)
-        self.decoder = miniDec()
+        self.encoder = miniEnc(hyper=enable_bpp) # 5.91M
+        self.decoder = miniDec() # 2.7M
 
         self.enable_bpp = enable_bpp
         if not enable_bpp:
             return
         self.factorized_entropy_func = Entropy_bottleneck(96) # 4.1k
-        self.hyper_dec = Hyper_Dec(96, 128, nums=[2,2,1,1]) # 2.7M
+        self.hyper_dec = Hyper_Dec(96, 128, nums=[2,2,1,1]) # 2.1M
         self.p = P_Model(128, num=2) # 885k
         self.context = Complex_context(ch=128, nums=[3,2]) # 402k
 
@@ -86,17 +86,17 @@ class miniEnc(nn.Module):
 
         self.trunk = nn.Sequential(
             conv2d(input_ch, c0, 5, 2, padding=2),
-            # 2x
             *[ResBlock(c0) for _ in range(2)],
+            # 2x
             conv2d(c0, c1, 5, 2, padding=2),
-            # 4x
             *[ResBlock(c1) for _ in range(2)],
+            # 4x
             conv2d(c1, c2, 5, 2, padding=2),
+            *[ResBlock(c2) for _ in range(3)],
             # 8x
-            *[ResBlock(c2) for _ in range(3)],
             conv2d(c2, c2, 5, 2, padding=2),
-            # 16x
             *[ResBlock(c2) for _ in range(3)],
+            # 16x
         )
         if not hyper:
             return
@@ -128,31 +128,31 @@ class miniEnc(nn.Module):
 class miniDec(nn.Module):
     """ mini NLAIC decoder
     """
-    def __init__(self, channels=[128, 64, 32, 16], input_features=3):
+    def __init__(self, channels=[128,128,64,64,32], input_features=3):
         super().__init__()
-        c3, c2, c1, c0 = channels
+        c4, c3, c2, c1, c0 = channels
         self.m1 = nn.Sequential(
-            *[ResBlock(c3) for _ in range(2)]
+            *[ResBlock(c4) for _ in range(3)]
         )
         self.up1 = nn.Sequential(
-            nn.ConvTranspose2d(c3, c2, 5, 2, 2, 1),
-            *[ResBlock(c2) for _ in range(2)]
+            nn.ConvTranspose2d(c4, c3, 5, 2, 2, 1),
+            *[ResBlock(c3) for _ in range(3)]
         )
         self.up2 = nn.Sequential(
-            nn.ConvTranspose2d(c2, c1, 5, 2, 2, 1),
-            *[ResBlock(c1) for _ in range(2)]
+            nn.ConvTranspose2d(c3, c2, 5, 2, 2, 1),
+            *[ResBlock(c2) for _ in range(3)]
         )
         self.up3 = nn.Sequential(
-            nn.ConvTranspose2d(c1, c1, 5, 2, 2, 1),
-            *[ResBlock(c1) for _ in range(2)]
+            nn.ConvTranspose2d(c2, c1, 5, 2, 2, 1),
+            *[ResBlock(c1) for _ in range(3)]
         )
         self.up4 = nn.Sequential(
             nn.ConvTranspose2d(c1, c0, 3, 2, 1, 1),
-            *[ResBlock(c0) for _ in range(1)],
+            *[ResBlock(c0) for _ in range(3)],
         )
         self.cv1 = conv2d(c0, input_features, 5, 1, 2)
 
-        self._feat_ch = c3
+        self._feat_ch = c4
 
     def forward(self, x):
         assert x.dim() == 4 and x.shape[1] == self._feat_ch
@@ -200,16 +200,10 @@ class Hyper_Dec(nn.Module):
 
 if __name__ == "__main__":
     from mycv.paths import WEIGHTS_DIR
+    from mycv.utils.torch_utils import num_params
     model = MiniNIC(enable_bpp=True)
     # model.load_state_dict(torch.load(WEIGHTS_DIR/'miniMSE.pt')['model'])
-
-    from mycv.utils.torch_utils import summary_weights
-    summary_weights(model.state_dict(), save_path='model.txt')
-
-    checkpoint = torch.load('C:/Projects/yolov5/runs/nic/mini9_v1/weights/last.pt')
-    summary_weights(checkpoint['model'], save_path='mini9.txt')
-
-    model.load_state_dict(checkpoint['model'])
+    # checkpoint = torch.load('C:/Projects/yolov5/runs/nic/mini9_v1/weights/last.pt')
     model.eval()
     model = model.cuda()
 
