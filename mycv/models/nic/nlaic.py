@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-from torch.distributions.uniform import Uniform
 
 from mycv.models.nic.basic_module import conv2d, ResBlock, Non_local_Block, UniverseQuant
 from mycv.models.nic.factorized_entropy_model import Entropy_bottleneck
@@ -174,7 +173,6 @@ class Hyper_Dec(nn.Module):
     def forward(self, x):
         x = self.conv1(x)
         x = self.trunk1(x) * torch.sigmoid(self.mask1(x)) + x
-        x = self.trunk1(x)
         x = self.trunk2(x)
         x = self.trunk3(x)
         return x
@@ -235,5 +233,5 @@ if __name__ == "__main__":
     model = model.cuda()
 
     from mycv.datasets.loadimgs import kodak_val
-    results = kodak_val(model, input_norm=False)
+    results = kodak_val(model, input_norm=False, bar=True)
     print(results)
