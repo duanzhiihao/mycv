@@ -175,7 +175,7 @@ def imagenet_val(model: torch.nn.Module, split='val', testloader=None,
         assert preds.shape == labels_all.shape
         tps = (preds == labels_all)
         acc = tps.sum().item() / len(tps)
-        acc_real = 0
+        acc_real = acc
     results = {'top1_old': acc, 'top1_real': acc_real}
     return results
 
