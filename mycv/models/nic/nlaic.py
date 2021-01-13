@@ -179,7 +179,7 @@ class Hyper_Dec(nn.Module):
 
 
 class Dec(nn.Module):
-    def __init__(self, input_features, N1, M, M1):
+    def __init__(self, input_features=3, N1=192, M=192, M1=96):
         super(Dec,self).__init__()
         self.N1 = N1
         self.M = M

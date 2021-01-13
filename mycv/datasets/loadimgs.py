@@ -4,6 +4,10 @@ import json
 from math import log10
 import cv2
 import torch
+import torchvision
+import numpy as np
+from PIL import Image
+import torchvision.transforms.functional as tvf
 
 import mycv.utils.image as imgUtils
 import mycv.utils.aug as augUtils
@@ -83,10 +87,6 @@ class LoadImages(torch.utils.data.Dataset):
 
         self.img_paths = _get_imgpaths(datasets, verbose)
         self.img_size  = img_size
-        # self.transform = album.Compose([
-        #     album.RandomCrop(img_size, img_size, p=1.0),
-        #     album.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.6, hue=0.04, p=1)
-        # ])
         self._input_norm = input_norm
         self._input_mean = torch.FloatTensor(RGB_MEAN).view(3, 1, 1)
         self._input_std  = torch.FloatTensor(RGB_STD).view(3, 1, 1)
@@ -142,7 +142,7 @@ def _imread(img_path):
     return input_, im
 
 
-def kodak_val(model: torch.nn.Module, input_norm=None, verbose=True, bar=False):
+def kodak_val(model: torch.nn.Module, input_norm=False, verbose=True, bar=False):
     """ Test on Kodak dataset
 
     Args:

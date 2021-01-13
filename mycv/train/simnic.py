@@ -5,7 +5,6 @@ from pathlib import Path
 import argparse
 from tqdm import tqdm
 from collections import defaultdict
-import math
 import cv2
 import torch
 from torch.optim.lr_scheduler import LambdaLR
@@ -83,9 +82,9 @@ def train():
 
     # optimizer
     if cfg.optimizer == 'SGD':
-        optimizer = torch.optim.SGD(model.named_parameters(), lr=cfg.lr)
+        optimizer = torch.optim.SGD(model.parameters(), lr=cfg.lr)
     elif cfg.optimizer == 'Adam':
-        optimizer = torch.optim.Adam(model.named_parameters(), lr=cfg.lr)
+        optimizer = torch.optim.Adam(model.parameters(), lr=cfg.lr)
     else:
         raise ValueError()
 
@@ -138,7 +137,10 @@ def train():
             nB, nC, nH, nW = imgs.shape
             # forward
             rec, probs = model(imgs)
-            l_rec = mse_func(rec, imgs) * nB
+            if cfg.loss == 'mse':
+                l_rec = mse_func(rec, imgs) * nB
+            else:
+                raise NotImplementedError()
             if probs is not None:
                 p1, p2 = probs
                 l_bpp = cal_bpp(p1, nH*nW) + cal_bpp(p2, nH*nW)
@@ -155,7 +157,6 @@ def train():
 
             # logging
             cur_lr = optimizer.param_groups[0]['lr']
-            loss = loss.detach().cpu().item()
             epoch_rec  = (epoch_rec*bi + l_rec.item()/nB) / (bi+1)
             epoch_bpp  = (epoch_bpp*bi + l_bpp.item()/nB) / (bi+1)
             epoch_loss = (epoch_loss*bi + loss.item()/nB) / (bi+1)
