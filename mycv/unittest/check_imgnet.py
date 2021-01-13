@@ -1,32 +1,55 @@
+import argparse
 from pathlib import Path
 from tqdm import tqdm
 from PIL import Image
 
 from mycv.paths import ILSVRC_DIR
 
+from torch.utils.data.dataset import Dataset
+from torch.utils.data.dataloader import DataLoader
+class Check(Dataset):
+    def __init__(self, img_paths) -> None:
+        self.img_paths = img_paths
+
+    def __len__(self):
+        return len(self.img_paths)
+
+    def __getitem__(self, index):
+        impath = self.img_paths[index]
+        img = Image.open(impath)
+        img.verify()
+        img.close()
+        return 0
+
+def check_images(img_paths, workers=4):
+    dataset = Check(img_paths)
+    dataloader = DataLoader(dataset, batch_size=workers*8, num_workers=workers)
+    for imgs in tqdm(dataloader):
+        do_nothing = 1
+
 
 if __name__ == "__main__":
-    # check images
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--workers', type=int)
+    args = parser.parse_args()
+
+    # imagenet root
     root = Path(ILSVRC_DIR)
 
     # check training set
     lines = open(root / 'ImageSets/CLS-LOC/train_cls.txt', 'r').read().strip().split('\n')
     img_paths = [root / f'Data/CLS-LOC/train/{s.split()[0]}' for s in lines]
+    img_paths = [str(s)+'.JPEG' for s in img_paths]
     print(f'Checking imagenet training set... total {len(img_paths)} images')
-    for impath in tqdm(img_paths):
-        impath = str(impath) + '.JPEG'
-        img = Image.open(impath)
-        img.verify()
+    check_images(img_paths, workers=args.workers)
 
     # check val set
     lines = open(root / 'ImageSets/CLS-LOC/val.txt', 'r').read().strip().split('\n')
     img_paths = [root / f'Data/CLS-LOC/val/{s.split()[0]}' for s in lines]
-    print(len(img_paths))
-    for impath in tqdm(img_paths):
-        impath = str(impath) + '.JPEG'
-        img = Image.open(impath)
-        img.verify()
+    img_paths = [str(s)+'.JPEG' for s in img_paths]
+    print(f'Checking imagenet validation set... total {len(img_paths)} images')
+    check_images(img_paths, workers=args.workers)
 
     # check labels
     assert (root / 'Annotations' / 'cls_val_real.json').exists()
-    assert (root / 'Annotations' / 'val.txt').exists()
+    assert (root / 'Annotations' / 'cls_val.txt').exists()
