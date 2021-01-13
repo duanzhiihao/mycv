@@ -2,10 +2,7 @@ import os
 from pathlib import Path
 import json
 from tqdm import tqdm
-import random
 import cv2
-cv2.setNumThreads(0)
-cv2.ocl.setUseOpenCL(False)
 import albumentations as album
 import torch
 
@@ -109,14 +106,15 @@ def imagenet_val(model: torch.nn.Module, split='val', testloader=None,
     """ Imagenet validation
 
     Args:
-        model (torch.nn.Module): [description]
-        split (str, optional): [description]. Defaults to 'val'.
-        testloader ([type], optional): [description]. Defaults to None.
-        img_size ([type], optional): [description]. Defaults to None.
-        batch_size ([type], optional): [description]. Defaults to None.
-        workers ([type], optional): [description]. Defaults to None.
-        input_norm ([type], optional): [description]. Defaults to None.
-    """    
+        model (torch.nn.Module): pytorch model
+        split (str, optional): see ImageNetCls. Defaults to 'val'.
+        testloader (optional): if not provided, a new dataloader will be created, \
+            and the following arguments must be provided:
+            img_size (int)
+            batch_size (int)
+            workers (int)
+            input_norm (bool)
+    """
     assert split.startswith('val')
     model.eval()
     device = next(model.parameters()).device
@@ -130,13 +128,18 @@ def imagenet_val(model: torch.nn.Module, split='val', testloader=None,
             pin_memory=True, drop_last=False
         )
     # annotations
-    # https://github.com/google-research/reassessed-imagenet
     if split == 'val':
-        labels_path = Path(ILSVRC_DIR) / 'Annotations' / 'cls_val_real.json'
-        labels_all = json.load(open(labels_path, 'r'))
-        assert len(testloader.dataset) == len(labels_all)
+        # original imagenet validation labels
+        fpath = ILSVRC_DIR / 'Annotations' / 'cls_val.txt'
+        labels_all = open(fpath).read().strip().split('\n')
+        labels_all = [int(line.split()[1]) for line in labels_all]
+        # 'real' labels https://github.com/google-research/reassessed-imagenet
+        fpath = ILSVRC_DIR / 'Annotations' / 'cls_val_real.json'
+        labels_real_all = json.load(open(fpath, 'r'))
+        assert len(testloader.dataset) == len(labels_all) == len(labels_real_all)
     else:
         labels_all = []
+        labels_real_all = None
 
     # traverse the dataset
     preds = []
@@ -158,16 +161,22 @@ def imagenet_val(model: torch.nn.Module, split='val', testloader=None,
             labels_all.append(labels)
     preds = torch.cat(preds, dim=0)
     assert preds.dim() == 1
+
     # compare the predictions and labels
     if split == 'val':
-        tps = [p in t for p,t in zip(preds,labels_all) if len(t) > 0]
-        acc = sum(tps) / len(tps)
+        # original labels
+        tps = [p == t for p,t in zip(preds,labels_all)]
+        acc = sum(tps).item() / len(tps)
+        # 'real' labels
+        tps = [p in t for p,t in zip(preds,labels_real_all) if len(t) > 0]
+        acc_real = sum(tps) / len(tps)
     else:
         labels_all = torch.cat(labels_all, dim=0)
         assert preds.shape == labels_all.shape
         tps = (preds == labels_all)
         acc = tps.sum().item() / len(tps)
-    results = {'top1': acc}
+        acc_real = 0
+    results = {'top1_old': acc, 'top1_real': acc_real}
     return results
 
 
@@ -189,5 +198,6 @@ if __name__ == "__main__":
     model.load_state_dict(torch.load(WEIGHTS_DIR / 'resnet50-19c8e357.pth'))
     model = model.cuda()
     model.eval()
-    results = imagenet_val(model, img_size=224, batch_size=64, workers=4, split='val200_600')
-    print(results['top1'])
+    results = imagenet_val(model, split='val',
+                img_size=224, batch_size=64, workers=4, input_norm=True)
+    print(results)
