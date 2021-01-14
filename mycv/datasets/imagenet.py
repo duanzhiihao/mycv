@@ -27,7 +27,7 @@ class ImageNetCls(torch.utils.data.Dataset):
     '''
     ImageNet Classification dataset
     '''
-    def __init__(self, split='train', img_size=224, input_norm=True):
+    def __init__(self, split='train', img_size=224, input_norm=True, color_aug=True):
         assert os.path.exists(ILSVRC_DIR)
         assert isinstance(img_size, int)
 
@@ -51,10 +51,13 @@ class ImageNetCls(torch.utils.data.Dataset):
 
         self.split     = split
         self.img_size  = img_size
-        self.transform = album.Compose([
-            album.RandomCrop(img_size, img_size, p=1.0),
-            album.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.6, hue=0.04, p=1)
-        ])
+        if color_aug:
+            self.transform = album.Compose([
+                album.RandomCrop(img_size, img_size, p=1.0),
+                album.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.6, hue=0.04, p=1)
+            ])
+        else:
+            self.transform = album.RandomCrop(img_size, img_size, p=1.0)
         self._input_norm = input_norm
         self._input_mean = torch.FloatTensor(RGB_MEAN).view(3, 1, 1)
         self._input_std  = torch.FloatTensor(RGB_STD).view(3, 1, 1)

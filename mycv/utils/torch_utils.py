@@ -164,11 +164,11 @@ class ModelEMA:
         self.updates = updates  # number of EMA updates
         self.warmup = warmup
         self.final_decay = decay  # final decay
-        # decay exponential ramp (to help early epochs)
         for p in self.ema.parameters():
             p.requires_grad_(False)
-    
+
     def get_decay(self):
+        # decay exponential ramp (to help early epochs)
         decay = self.final_decay * (1 - np.exp(-self.updates / self.warmup))
         return decay
 
