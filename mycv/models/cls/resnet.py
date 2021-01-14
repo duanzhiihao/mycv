@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.cuda.amp as amp
 
 
 def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1):
@@ -117,21 +118,22 @@ class ResNet(nn.Module):
                                 norm_layer=norm_layer))
         return nn.Sequential(*layers)
 
-    def forward(self, x):
-        # x: [b, 3, H, W]
-        x = self.conv1(x) # x: [b, 64, H/2, W/2]
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x) # x: [b, 64, H/4, W/4]
+    def forward(self, x, enable_amp=False):
+        with amp.autocast(enabled=enable_amp):
+            # x: [b, 3, H, W]
+            x = self.conv1(x) # x: [b, 64, H/2, W/2]
+            x = self.bn1(x)
+            x = self.relu(x)
+            x = self.maxpool(x) # x: [b, 64, H/4, W/4]
 
-        x1 = self.layer1(x) # x: [b, 256, H/4, W/4]
-        x2 = self.layer2(x1) # x: [b, 512, H/8, W/8]
-        x3 = self.layer3(x2) # x: [b, 1024, H/16, W/16]
-        x4 = self.layer4(x3) # x: [b, 2048, H/32, W/32]
+            x1 = self.layer1(x) # x: [b, 256, H/4, W/4]
+            x2 = self.layer2(x1) # x: [b, 512, H/8, W/8]
+            x3 = self.layer3(x2) # x: [b, 1024, H/16, W/16]
+            x4 = self.layer4(x3) # x: [b, 2048, H/32, W/32]
 
-        x = self.avgpool(x4) # x: [b, 2048, 1, 1]
-        x = torch.flatten(x, 1)
-        x = self.fc(x) 
+            x = self.avgpool(x4) # x: [b, 2048, 1, 1]
+            x = torch.flatten(x, 1)
+            x = self.fc(x) 
         self.cache = [x1, x2, x3, x4]
         # x: [b, num_class]
         return x

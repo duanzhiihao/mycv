@@ -8,7 +8,6 @@ from collections import defaultdict
 import torch
 import torch.cuda.amp as amp
 from torch.optim.lr_scheduler import LambdaLR
-from torch.nn.parallel import DistributedDataParallel as DDP
 import wandb
 
 from mycv.utils.general import increment_dir
@@ -29,17 +28,15 @@ def train():
     # ====== set the run settings ======
     parser = argparse.ArgumentParser()
     parser.add_argument('--project',    type=str,  default='imagenet')
-    parser.add_argument('--group',      type=str,  default='default')
+    parser.add_argument('--group',      type=str,  default='mini200')
     parser.add_argument('--model',      type=str,  default='res50')
     parser.add_argument('--resume',     type=str,  default='')
     parser.add_argument('--batch_size', type=int,  default=128)
     parser.add_argument('--amp',        type=bool, default=True)
     parser.add_argument('--ema',        type=bool, default=True)
-    parser.add_argument('--optimizer',  type=str,  default='SGD', choices=['Adam', 'SGD'])
     parser.add_argument('--epochs',     type=int,  default=100)
-    parser.add_argument('--device',     type=int,  default=0)
+    parser.add_argument('--device',     type=int,  default=[0], nargs='+')
     parser.add_argument('--workers',    type=int,  default=4)
-    parser.add_argument('--local_rank', type=int,  default=-1, help='DDP arg, do not modify')
     # parser.add_argument('--dryrun',   type=bool, default=True)
     parser.add_argument('--dryrun',     action='store_true')
     cfg = parser.parse_args()
@@ -51,46 +48,30 @@ def train():
     cfg.lr = 0.01
     cfg.momentum = 0.9
     cfg.weight_decay = 0.0001
-    cfg.nesterov = True
+    cfg.nesterov = False
     # lr scheduler
     cfg.lrf = 0.2 # min lr factor
     cfg.lr_warmup_epochs = 1
     # EMA
     cfg.ema_warmup_epochs = 4
-    # Main process
-    IS_MAIN = (cfg.local_rank in [-1, 0])
 
     # check arguments
-    metric:     str = 'top1_real'
-    epochs:     int = cfg.epochs
-    local_rank: int = cfg.local_rank
-    world_size: int = int(os.environ.get('WORLD_SIZE', 1))
-    assert local_rank == int(os.environ.get('RANK', -1)), 'Only support single node'
-    assert cfg.batch_size % world_size == 0, 'batch_size must be multiple of device count'
-    batch_size: int = cfg.batch_size // world_size
-    if IS_MAIN:
-        print(cfg, '\n')
-        print('Batch size on each single GPU =', batch_size, '\n')
+    metric: str = 'top1_real'
+    epochs: int = cfg.epochs
+    print(cfg, '\n')
     # fix random seeds for reproducibility
     set_random_seeds(1)
     torch.backends.cudnn.benchmark = True
     # device setting
     assert torch.cuda.is_available()
-    if local_rank == -1: # Single GPU
-        device = torch.device(f'cuda:{cfg.device}')
-    else: # DDP mode
-        assert torch.cuda.device_count() > local_rank and torch.distributed.is_available()
-        torch.cuda.set_device(local_rank)
-        device = torch.device('cuda', local_rank)
-        torch.distributed.init_process_group(
-            backend='nccl', init_method='env://', world_size=world_size, rank=local_rank
-        )
-    print(f'Local rank: {local_rank}, using device {device}:', 'device property:',
-          torch.cuda.get_device_properties(device))
+    for _id in cfg.device:
+        print(f'Using device {_id}:', torch.cuda.get_device_properties(_id))
+    device = torch.device(f'cuda:{cfg.device[0]}')
+    bs_each = cfg.batch_size // len(cfg.device)
+    print('Batch size on each single GPU =', bs_each, '\n')
 
     # Dataset
-    if IS_MAIN:
-        print('Initializing Datasets and Dataloaders...')
+    print('Initializing Datasets and Dataloaders...')
     if cfg.group == 'default':
         train_split = 'train'
         val_split = 'val'
@@ -103,38 +84,19 @@ def train():
         raise ValueError()
     # training set
     trainset = ImageNetCls(train_split, img_size=cfg.img_size, input_norm=cfg.input_norm)
-    sampler = torch.utils.data.distributed.DistributedSampler(
-        trainset, num_replicas=world_size, rank=local_rank, shuffle=True
-    ) if local_rank != -1 else None
-    trainloader = torch.utils.data.DataLoader(
-        trainset, batch_size=batch_size, shuffle=(sampler is None), sampler=sampler,
-        num_workers=cfg.workers, pin_memory=True
-    )
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=cfg.batch_size,
+                    shuffle=True, num_workers=cfg.workers, pin_memory=True)
     # test set
     testloader = torch.utils.data.DataLoader(
         ImageNetCls(split=val_split, img_size=cfg.img_size, input_norm=cfg.input_norm),
-        batch_size=batch_size, shuffle=False, num_workers=cfg.workers//2,
+        batch_size=bs_each//2, shuffle=False, num_workers=cfg.workers//2,
         pin_memory=True, drop_last=False
     )
 
     # Initialize model
-    if cfg.model == 'res50':
-        from mycv.models.cls.resnet import resnet50
-        model = resnet50(num_classes=cfg.num_class)
-    elif cfg.model == 'res101':
-        from mycv.models.cls.resnet import resnet101
-        model = resnet101(num_classes=cfg.num_class)
-    elif cfg.model.startswith('yolov5'):
-        from mycv.models.yolov5.cls import YOLOv5Cls
-        assert cfg.model[-1] in ['s', 'm', 'l']
-        model = YOLOv5Cls(model=cfg.model[-1], num_class=cfg.num_class)
-    elif cfg.model.startswith('csp'):
-        from mycv.models.yolov5.cls import CSP
-        assert cfg.model[-1] in ['s', 'm', 'l']
-        model = CSP(model=cfg.model[-1], num_class=cfg.num_class)
-    else:
-        raise NotImplementedError()
+    model = get_model(cfg.model, cfg.num_class)
     model = model.to(device)
+
     # loss function
     loss_func = torch.nn.CrossEntropyLoss(reduction='mean')
 
@@ -150,18 +112,14 @@ def train():
         {'params': pgb, 'lr': cfg.lr, 'weight_decay': 0.0},
         {'params': pgw, 'lr': cfg.lr, 'weight_decay': cfg.weight_decay}
     ]
-    if IS_MAIN:
-        print('Parameter groups:', [len(pg['params']) for pg in parameters])
+    print('Parameter groups:', [len(pg['params']) for pg in parameters])
     del pgb, pgw
 
     # optimizer
-    if cfg.optimizer == 'SGD':
-        optimizer = torch.optim.SGD(parameters, lr=cfg.lr,
-                                    momentum=cfg.momentum, nesterov=cfg.nesterov)
-    elif cfg.optimizer == 'Adam':
-        optimizer = torch.optim.Adam(parameters, lr=cfg.lr)
-    else:
-        raise ValueError()
+    optimizer = torch.optim.SGD(parameters, lr=cfg.lr,
+                                momentum=cfg.momentum, nesterov=cfg.nesterov)
+    # optimizer = torch.optim.Adam(parameters, lr=cfg.lr)
+
     # AMP
     scaler = amp.GradScaler(enabled=cfg.amp)
 
@@ -179,32 +137,27 @@ def train():
         scaler.load_state_dict(checkpoint['scaler'])
         start_epoch = checkpoint['epoch'] + 1
         best_fitness = checkpoint.get(metric, 0)
-        if IS_MAIN:
-            wb_id = open(log_dir / 'wandb_id.txt', 'r').read()
+        wb_id = open(log_dir / 'wandb_id.txt', 'r').read()
     else:
         # new experiment
         run_name = increment_dir(dir_root=log_parent, name=cfg.model)
         log_dir = log_parent / run_name # wandb logging dir
-        if IS_MAIN:
-            os.makedirs(log_dir, exist_ok=False)
-            print(str(model), file=open(log_dir / 'model.txt', 'w'))
+        os.makedirs(log_dir, exist_ok=False)
+        print(str(model), file=open(log_dir / 'model.txt', 'w'))
         start_epoch = 0
         best_fitness = 0
 
     # initialize wandb
     if cfg.dryrun:
         os.environ["WANDB_MODE"] = "dryrun"
-    if IS_MAIN:
-        wbrun = wandb.init(project=cfg.project, group=cfg.group, name=run_name,
-                           config=cfg, dir='runs/', resume='allow', id=wb_id)
-        cfg = wbrun.config
-        cfg.log_dir = log_dir
-        cfg.wandb_id = wbrun.id
-        if not (log_dir / 'wandb_id.txt').exists():
-            with open(log_dir / 'wandb_id.txt', 'w') as f:
-                f.write(wbrun.id)
-    else:
-        wbrun = None
+    wbrun = wandb.init(project=cfg.project, group=cfg.group, name=run_name,
+                        config=cfg, dir='runs/', resume='allow', id=wb_id)
+    cfg = wbrun.config
+    cfg.log_dir = log_dir
+    cfg.wandb_id = wbrun.id
+    if not (log_dir / 'wandb_id.txt').exists():
+        with open(log_dir / 'wandb_id.txt', 'w') as f:
+            f.write(wbrun.id)
 
     # lr scheduler
     _warmup = cfg.lr_warmup_epochs * len(trainloader)
@@ -212,21 +165,17 @@ def train():
     lr_func = lambda x: warmup_cosine(x, cfg.lrf, _warmup, _total)
     scheduler = LambdaLR(optimizer, lr_lambda=lr_func, last_epoch=start_epoch - 1)
 
-    # SyncBatchNorm
-    if local_rank != -1 and cfg.sync_bn:
-        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-
     # Exponential moving average
-    if IS_MAIN and cfg.ema:
+    if cfg.ema:
         ema = ModelEMA(model, decay=0.9999)
         ema.updates = start_epoch * len(trainloader)  # set EMA updates
         ema.warmup = cfg.ema_warmup_epochs * len(trainloader) # set EMA warmup
     else:
         ema = None
 
-    # DDP mode
-    if local_rank != -1:
-        model = DDP(model, device_ids=[local_rank], output_device=local_rank)
+    # DP mode
+    if len(cfg.device) > 1:
+        model = torch.nn.DataParallel(model, device_ids=cfg.device)
 
     # ======================== start training ========================
     pbar_title = ('%-10s' * 7) % (
@@ -235,15 +184,10 @@ def train():
     niter = s = None
     for epoch in range(start_epoch, epochs):
         model.train()
-        if local_rank != -1:
-            trainloader.sampler.set_epoch(epoch)
-        optimizer.zero_grad()
 
-        pbar = enumerate(trainloader)
         train_loss, train_acc = 0.0, 0.0
-        if IS_MAIN:
-            print('\n' + pbar_title) # title
-            pbar = tqdm(pbar, total=len(trainloader))
+        print('\n' + pbar_title) # title
+        pbar = tqdm(enumerate(trainloader), total=len(trainloader))
         for i, (imgs, labels) in pbar:
             imgs = imgs.to(device=device)
             labels = labels.to(device=device)
@@ -251,10 +195,8 @@ def train():
 
             # forward
             with amp.autocast(enabled=cfg.amp):
-                p = model(imgs)
+                p = model(imgs, enable_amp=cfg.amp)
                 loss = loss_func(p, labels) * nB
-                if local_rank != -1:
-                    loss = loss * world_size
                 # loss is averaged within image, sumed over batch, and sumed over gpus
             # backward, update
             scaler.scale(loss).backward()
@@ -267,74 +209,89 @@ def train():
             scheduler.step()
 
             # logging
-            if IS_MAIN:
-                niter = epoch * len(trainloader) + i
-                cur_lr = optimizer.param_groups[0]['lr']
-                loss = loss.detach().cpu().item()
-                acc = cal_acc(p.detach(), labels)
-                train_loss = (train_loss*i + loss/nB) / (i+1)
-                train_acc = (train_acc*i + acc) / (i+1)
-                mem = torch.cuda.max_memory_allocated(device) / 1e9
-                s = ('%-10s' * 2 + '%-10.4g' * 5) % (
-                    f'{epoch}/{epochs-1}', f'{mem:.3g}G', cur_lr, train_loss,
-                    100*train_acc, 100*results['top1_real'], 100*results['top1_old']
-                )
-                pbar.set_description(s)
-                torch.cuda.reset_peak_memory_stats()
-                # Weights & Biases logging
-                if niter % 100 == 0:
-                    wbrun.log({
-                        'general/lr': cur_lr,
-                        'loss/train_loss': train_loss,
-                        'metric/train_acc': train_acc,
-                        'ema/n_updates': ema.updates if cfg.ema else 0,
-                        'ema0/decay': ema.get_decay() if cfg.ema else 0
-                    }, step=niter)
-                # logging end
+            niter = epoch * len(trainloader) + i
+            cur_lr = optimizer.param_groups[0]['lr']
+            loss = loss.detach().cpu().item()
+            acc = cal_acc(p.detach(), labels)
+            train_loss = (train_loss*i + loss/nB) / (i+1)
+            train_acc = (train_acc*i + acc) / (i+1)
+            mem = torch.cuda.max_memory_allocated(device) / 1e9
+            s = ('%-10s' * 2 + '%-10.4g' * 5) % (
+                f'{epoch}/{epochs-1}', f'{mem:.3g}G', cur_lr, train_loss,
+                100*train_acc, 100*results['top1_real'], 100*results['top1_old']
+            )
+            pbar.set_description(s)
+            torch.cuda.reset_peak_memory_stats()
+            # Weights & Biases logging
+            if niter % 100 == 0:
+                wbrun.log({
+                    'general/lr': cur_lr,
+                    'loss/train_loss': train_loss,
+                    'metric/train_acc': train_acc,
+                    'ema/n_updates': ema.updates if cfg.ema else 0,
+                    'ema0/decay': ema.get_decay() if cfg.ema else 0
+                }, step=niter)
+            # logging end
             # ----Mini batch end
         # ----Epoch end
-        # If DDP mode, synchronize model parameters on all gpus
-        if local_rank != -1:
-            model._sync_params_and_buffers(authoritative_rank=0)
 
         # Evaluation
-        if IS_MAIN:
-            _log_dic = {'general/epoch': epoch}
-            _eval_model = model.module if is_parallel(model) else model
-            results = imagenet_val(_eval_model, split=val_split, testloader=testloader)
-            _log_dic.update({'metric/plain_val_'+k: v for k,v in results.items()})
+        _log_dic = {'general/epoch': epoch}
+        _eval_model = model.module if is_parallel(model) else model
+        results = imagenet_val(_eval_model, split=val_split, testloader=testloader)
+        _log_dic.update({'metric/plain_val_'+k: v for k,v in results.items()})
 
-            if cfg.ema:
-                results = imagenet_val(ema.ema, split=val_split, testloader=testloader)
-                _log_dic.update({f'metric/ema_val_'+k: v for k,v in results.items()})
-                # select best result among all emas
-                _save_model = ema.ema
-            else:
-                _save_model = model
+        if cfg.ema:
+            results = imagenet_val(ema.ema, split=val_split, testloader=testloader)
+            _log_dic.update({f'metric/ema_val_'+k: v for k,v in results.items()})
+            # select best result among all emas
+            _save_model = ema.ema
+        else:
+            _save_model = model
 
-            _cur_fitness = results[metric]
-            # wandb log
-            wbrun.log(_log_dic, step=niter)
-            # Write evaluation results
-            res = s + '||' + '%10.4g' * 1 % (_cur_fitness)
-            with open(log_dir / 'results.txt', 'a') as f:
-                f.write(res + '\n')
-            # save last checkpoint
-            checkpoint = {
-                'model'     : _save_model.state_dict(),
-                'optimizer' : optimizer.state_dict(),
-                'scaler'    : scaler.state_dict(),
-                'epoch'     : epoch,
-                metric      : _cur_fitness,
-            }
-            torch.save(checkpoint, log_dir / 'last.pt')
-            # save best checkpoint
-            if _cur_fitness > best_fitness:
-                best_fitness = _cur_fitness
-                torch.save(checkpoint, log_dir / 'best.pt')
-            del checkpoint
+        _cur_fitness = results[metric]
+        # wandb log
+        wbrun.log(_log_dic, step=niter)
+        # Write evaluation results
+        res = s + '||' + '%10.4g' * 1 % (_cur_fitness)
+        with open(log_dir / 'results.txt', 'a') as f:
+            f.write(res + '\n')
+        # save last checkpoint
+        checkpoint = {
+            'model'     : _save_model.state_dict(),
+            'optimizer' : optimizer.state_dict(),
+            'scaler'    : scaler.state_dict(),
+            'epoch'     : epoch,
+            metric      : _cur_fitness,
+        }
+        torch.save(checkpoint, log_dir / 'last.pt')
+        # save best checkpoint
+        if _cur_fitness > best_fitness:
+            best_fitness = _cur_fitness
+            torch.save(checkpoint, log_dir / 'best.pt')
+        del checkpoint
         # ----Epoch end
     # ----Training end
+
+
+def get_model(name, num_class):
+    if name == 'res50':
+        from mycv.models.cls.resnet import resnet50
+        model = resnet50(num_classes=num_class)
+    elif name == 'res101':
+        from mycv.models.cls.resnet import resnet101
+        model = resnet101(num_classes=num_class)
+    elif name.startswith('yolov5'):
+        from mycv.models.yolov5.cls import YOLOv5Cls
+        assert name[-1] in ['s', 'm', 'l']
+        model = YOLOv5Cls(model=name[-1], num_class=num_class)
+    elif name.startswith('csp'):
+        from mycv.models.yolov5.cls import CSP
+        assert name[-1] in ['s', 'm', 'l']
+        model = CSP(model=name[-1], num_class=num_class)
+    else:
+        raise ValueError()
+    return model
 
 
 if __name__ == '__main__':
