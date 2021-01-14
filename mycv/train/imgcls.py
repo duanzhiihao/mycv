@@ -43,7 +43,6 @@ def train():
     # model
     cfg.img_size = 224
     cfg.input_norm = False
-    cfg.sync_bn = False
     # optimizer
     cfg.lr = 0.01
     cfg.momentum = 0.9
@@ -195,7 +194,7 @@ def train():
 
             # forward
             with amp.autocast(enabled=cfg.amp):
-                p = model(imgs, enable_amp=cfg.amp)
+                p = model(imgs)
                 loss = loss_func(p, labels) * nB
                 # loss is averaged within image, sumed over batch, and sumed over gpus
             # backward, update
