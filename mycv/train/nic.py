@@ -36,8 +36,7 @@ def train():
     parser.add_argument('--device',     type=int,  default=0)
     parser.add_argument('--workers',    type=int,  default=4)
     parser.add_argument('--local_rank', type=int,  default=-1, help='DDP arg, do not modify')
-    # parser.add_argument('--dryrun',   type=bool, default=True)
-    parser.add_argument('--dryrun',     action='store_true')
+    parser.add_argument('--wbmode',     type=str,  default='online')
     cfg = parser.parse_args()
     # model
     cfg.img_size = 192
@@ -173,11 +172,9 @@ def train():
         cur_bpp = 0
 
     # initialize wandb
-    if cfg.dryrun:
-        os.environ["WANDB_MODE"] = "dryrun"
     if IS_MAIN:
-        wbrun = wandb.init(project=cfg.project, group=cfg.group, name=run_name,
-                           config=cfg, dir='runs/', resume='allow', id=wb_id)
+        wbrun = wandb.init(project=cfg.project, group=cfg.group, name=run_name, config=cfg,
+                           dir='runs/', resume='allow', id=wb_id, mode=cfg.wbmode)
         cfg = wbrun.config
         cfg.log_dir = log_dir
         cfg.wandb_id = wbrun.id
