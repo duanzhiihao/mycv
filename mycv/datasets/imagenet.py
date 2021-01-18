@@ -92,6 +92,8 @@ class ImageNetCls(torch.utils.data.Dataset):
             img = tvf.resize(img, size=int(img_size/224*256))
             img = tvf.center_crop(img, (img_size,img_size))
             im = tvf.to_tensor(img)
+        if im.shape[0] == 1:
+            im = im.expand(3, -1, -1)
 
         # normalize such that mean = 0 and std = 1
         if self._input_norm:
