@@ -1,7 +1,10 @@
+from typing import Union
 import random
 import numpy as np
 import cv2
+from PIL import Image
 import torch
+import torchvision.transforms.functional as tvf
 
 import mycv.utils.image as imgUtils
 
@@ -34,18 +37,47 @@ def random_scale(im: np.ndarray, low: int, high: int):
 
 
 def random_crop(im: np.ndarray, crop_hw: tuple):
-    ''' random crop
-    '''
-    assert imgUtils.is_image(im)
-    if im.shape[:2] == crop_hw:
-        return im
+    """ random crop
 
+    Args:
+        im (np.ndarray): [description]
+        crop_hw (tuple): [description]
+    """
+    if imgUtils.is_image(im, cv2_ok=True, pil_ok=False):
+        im = _random_crop_cv2(im, crop_hw)
+    elif imgUtils.is_image(im, cv2_ok=False, pil_ok=True):
+        im = _random_crop_pil(im, crop_hw)
+    else:
+        raise ValueError('Input is neither a valid cv2 or PIL image.')
+    return im
+
+
+def _random_crop_cv2(im: np.ndarray, crop_hw: tuple):
+    """ random crop for cv2
+    """
     height, width = im.shape[:2]
+    if (height, width) == crop_hw:
+        return im
     ch, cw = crop_hw
+    assert height >= ch and width >= cw
     y1 = random.randint(0, height-ch)
     x1 = random.randint(0, width-cw)
     im = im[y1:y1+ch, x1:x1+cw, :]
     return im
+
+
+def _random_crop_pil(img: Image.Image, crop_hw: tuple):
+    """ random crop for cv2
+    """
+    height, width = img.height, img.width
+    if (height, width) == crop_hw:
+        return img
+    ch, cw = crop_hw
+    assert height >= ch and width >= cw
+    y1 = random.randint(0, height-ch)
+    x1 = random.randint(0, width-cw)
+    img = img.crop(box=(x1, y1, x1+cw, y1+ch))
+    return img
 
 
 def augment_hsv(im, hgain=0.1, sgain=0.5, vgain=0.5):
@@ -70,14 +102,24 @@ def augment_hsv(im, hgain=0.1, sgain=0.5, vgain=0.5):
     return im
 
 
-def hflip(im: np.ndarray):
+def random_hflip(im: Union[np.ndarray, Image.Image]):
     '''
     Horizontal flip
 
     Args:
         im: image
     '''
-    im = cv2.flip(im, 1) # horizontal flip
+    flag = (torch.rand(1) > 0.5).item()
+    if flag:
+        return im
+
+    if isinstance(im, np.ndarray):
+        im = cv2.flip(im, 1) # horizontal flip
+    elif isinstance(im, Image.Image):
+        im = im.transpose(Image.FLIP_LEFT_RIGHT)
+    else:
+        raise ValueError()
+
     return im
 
 

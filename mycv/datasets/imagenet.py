@@ -2,11 +2,12 @@ import os
 from pathlib import Path
 import json
 from tqdm import tqdm
-import cv2
-import albumentations as album
+import random
+from PIL import Image
 import torch
+import torchvision.transforms as tvt
+import torchvision.transforms.functional as tvf
 
-import mycv.utils.image as imgUtils
 import mycv.utils.aug as augUtils
 from mycv.paths import ILSVRC_DIR
 
@@ -52,12 +53,12 @@ class ImageNetCls(torch.utils.data.Dataset):
         self.split     = split
         self.img_size  = img_size
         if color_aug:
-            self.transform = album.Compose([
-                album.RandomCrop(img_size, img_size, p=1.0),
-                album.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.6, hue=0.04, p=1)
+            self.transform = tvt.Compose([
+                tvt.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.6, hue=0.04),
+                tvt.ToTensor()
             ])
         else:
-            self.transform = album.RandomCrop(img_size, img_size, p=1.0)
+            self.transform = tvt.ToTensor()
         self._input_norm = input_norm
         self._input_mean = torch.FloatTensor(RGB_MEAN).view(3, 1, 1)
         self._input_std  = torch.FloatTensor(RGB_STD).view(3, 1, 1)
@@ -68,9 +69,7 @@ class ImageNetCls(torch.utils.data.Dataset):
     def __getitem__(self, index: int):
         impath = self.img_paths[index]
         # image
-        im = cv2.imread(impath)
-        assert im is not None, f'Error loading image {impath}'
-        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+        img = Image.open(impath)
         # label
         if self.split == 'val':
             label = -1
@@ -79,28 +78,26 @@ class ImageNetCls(torch.utils.data.Dataset):
             label = WNID_TO_IDX[wnid]
 
         # data augmentation
+        img_size = self.img_size
         # im = self.transform(im)
         if self.split.startswith('train'):
-            low, high = int(self.img_size/224*256), int(self.img_size/224*384)
-            im = augUtils.random_scale(im, low=low, high=high)
-            # im = augUtils.random_crop(im, crop_hw=(self.img_size,self.img_size))
-            im = self.transform(image=im)['image']
-            if torch.rand(1).item() > 0.5:
-                im = cv2.flip(im, 1) # horizontal flip
+            low, high = int(img_size/224*256), int(img_size/224*384)
+            img = tvf.resize(img, size=random.randint(low, high))
+            img = augUtils.random_crop(img, crop_hw=(img_size,img_size))
+            img = augUtils.random_hflip(img)
+            im = self.transform(img)
         else:
             assert self.split.startswith('val')
             # resize and center crop
-            im = imgUtils.scale(im, int(self.img_size/224*256), side='shorter')
-            im = imgUtils.center_crop(im, crop_hw=(self.img_size,self.img_size))
-        assert imgUtils.is_image(im)
+            img = tvf.resize(img, size=int(img_size/224*256))
+            img = tvf.center_crop(img, (img_size,img_size))
+            im = tvf.to_tensor(img)
 
-        # to tensor
-        im = torch.from_numpy(im).permute(2, 0, 1).float() / 255
         # normalize such that mean = 0 and std = 1
         if self._input_norm:
             im = (im - self._input_mean) / self._input_std
 
-        assert im.shape[1:] == (self.img_size, self.img_size)
+        assert im.shape == (3, img_size, img_size)
         return im, label
 
 
@@ -156,6 +153,8 @@ def imagenet_val(model: torch.nn.Module, split='val', testloader=None,
         imgs = imgs.to(device=device)
         with torch.no_grad():
             p = model(imgs)
+            if isinstance(p, tuple):
+                p = p[1]
         assert p.dim() == 2
         _, p = torch.max(p.cpu(), dim=1)
         preds.append(p)
@@ -185,16 +184,17 @@ def imagenet_val(model: torch.nn.Module, split='val', testloader=None,
 
 
 if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
     # dataset = ImageNetCls(split='train')
     # dataloader = torch.utils.data.DataLoader(dataset, batch_size=2, num_workers=0)
-
-    # import matplotlib.pyplot as plt
     # for imgs, labels in tqdm(dataloader):
     #     # continue
     #     for im, lbl in zip(imgs, labels):
     #         im = im * dataset._input_std + dataset._input_mean
     #         im = im.permute(1,2,0).numpy()
     #         plt.imshow(im); plt.show()
+    #     imgs = imgs
 
     from mycv.models.cls.resnet import resnet50
     from mycv.paths import WEIGHTS_DIR

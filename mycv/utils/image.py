@@ -1,11 +1,28 @@
 import numpy as np
 import cv2
+from PIL import Image
 import torch
 
 
-def is_image(im):
-    flag = isinstance(im, np.ndarray) and im.dtype == np.uint8 \
-           and im.ndim == 3 and im.shape[2] == 3
+def is_image(im, cv2_ok=True, pil_ok=True):
+    """ Check if the input is a valid image or not
+
+    Args:
+        im: image
+        cv2_ok (bool, optional): check cv2. Defaults to True.
+        pil_ok (bool, optional): check pil. Defaults to True.
+    """
+    assert cv2_ok or pil_ok
+    if cv2_ok:
+        flag_cv2 = isinstance(im, np.ndarray) and im.dtype == np.uint8 \
+            and im.ndim == 3 and im.shape[2] == 3
+    else:
+        flag_cv2 = False
+    if pil_ok:
+        flag_pil = isinstance(im, Image.Image)
+    else:
+        flag_pil = False
+    flag = flag_cv2 or flag_pil
     return flag
 
 
@@ -94,7 +111,7 @@ def scale(im: np.ndarray, size: int, side='shorter'):
         im (np.ndarray): image
         size (int): target size
     """
-    assert is_image(im)
+    assert is_image(im, cv2_ok=True, pil_ok=False)
     old_hw = im.shape[:2]
     if side == 'longer':
         ratio = size / max(old_hw[0], old_hw[1]) # Scale ratio (new / old)
