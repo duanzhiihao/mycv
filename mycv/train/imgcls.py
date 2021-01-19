@@ -175,7 +175,7 @@ def train():
 
     # ======================== start training ========================
     pbar_title = ('%-10s' * 7) % (
-        'Epoch', 'GPU_mem', 'lr', 'tr_loss', 'tr_acc', 'top1_real', 'top1_old'
+        'Epoch', 'GPU_mem', 'lr', 'tr_loss', 'tr_acc', 'top1', 'top1_real',
     )
     niter = s = None
     for epoch in range(start_epoch, epochs):
@@ -214,7 +214,7 @@ def train():
             mem = torch.cuda.max_memory_allocated(device) / 1e9
             s = ('%-10s' * 2 + '%-10.4g' * 5) % (
                 f'{epoch}/{epochs-1}', f'{mem:.3g}G', cur_lr, train_loss,
-                100*train_acc, 100*results['top1_real'], 100*results['top1_old']
+                100*train_acc, 100*results['top1'], 100*results['top1_real'],
             )
             pbar.set_description(s)
             torch.cuda.reset_peak_memory_stats()

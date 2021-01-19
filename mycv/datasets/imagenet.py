@@ -35,7 +35,7 @@ class ImageNetCls(torch.utils.data.Dataset):
         if split == 'val':
             img_dir = IMAGENET_DIR / 'val'
         else:
-            img_dir = IMAGENET_DIR / split
+            img_dir = IMAGENET_DIR / 'train'
         assert ann_path.is_file(), f'Error: {ann_path} does not exist.'
         lines = open(ann_path, 'r').read().strip().split('\n')
 
