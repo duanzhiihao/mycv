@@ -37,7 +37,7 @@ def train():
     parser.add_argument('--epochs',     type=int,  default=100)
     parser.add_argument('--device',     type=int,  default=[0], nargs='+')
     parser.add_argument('--workers',    type=int,  default=4)
-    parser.add_argument('--wbmode',     type=str,  default='online')
+    parser.add_argument('--wbmode',     type=str,  default='disabled')
     cfg = parser.parse_args()
     # model
     cfg.img_size = 224
