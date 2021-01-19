@@ -40,13 +40,11 @@ def sample(num_cls=200, num_train=600, num_val=50):
         with open(trainlabel_path, 'a', newline='\n') as f:
             for imname in train_names:
                 assert imname.endswith('.JPEG')
-                s = imname.replace('.JPEG', '')
-                f.write(f'{wnid}/{s} {cls_idx}\n')
+                f.write(f'{wnid}/{imname} {cls_idx}\n')
         with open(vallabel_path, 'a', newline='\n') as f:
             for imname in val_names:
                 assert imname.endswith('.JPEG')
-                s = imname.replace('.JPEG', '')
-                f.write(f'{wnid}/{s} {cls_idx}\n')
+                f.write(f'{wnid}/{imname} {cls_idx}\n')
 
 
 if __name__ == "__main__":
