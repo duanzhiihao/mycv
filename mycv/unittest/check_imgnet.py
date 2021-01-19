@@ -2,11 +2,12 @@ import argparse
 from pathlib import Path
 from tqdm import tqdm
 from PIL import Image
+from torch.utils.data.dataset import Dataset
+from torch.utils.data.dataloader import DataLoader
+import torchvision.transforms.functional as tvf
 
 from mycv.paths import ILSVRC_DIR
 
-from torch.utils.data.dataset import Dataset
-from torch.utils.data.dataloader import DataLoader
 class Check(Dataset):
     def __init__(self, img_paths) -> None:
         self.img_paths = img_paths
@@ -17,8 +18,8 @@ class Check(Dataset):
     def __getitem__(self, index):
         impath = self.img_paths[index]
         img = Image.open(impath)
-        img.verify()
-        img.close()
+        im = tvf.to_tensor(img)
+        assert im.dim() == 3 and im.shape[0] in {1, 3}
         return 0
 
 def check_images(img_paths, workers=4):

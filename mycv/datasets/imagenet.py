@@ -92,6 +92,8 @@ class ImageNetCls(torch.utils.data.Dataset):
             img = tvf.resize(img, size=int(img_size/224*256))
             img = tvf.center_crop(img, (img_size,img_size))
             im = tvf.to_tensor(img)
+
+        assert im.dim() == 3 and im.shape[1:] == (img_size, img_size), f'{im.shape}'
         if im.shape[0] == 1:
             im = im.expand(3, -1, -1)
 
@@ -99,7 +101,7 @@ class ImageNetCls(torch.utils.data.Dataset):
         if self._input_norm:
             im = (im - self._input_mean) / self._input_std
 
-        assert im.shape == (3, img_size, img_size)
+        assert im.shape == (3, img_size, img_size), f'{im.shape}, {impath}'
         return im, label
 
 
