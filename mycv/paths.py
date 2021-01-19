@@ -18,7 +18,7 @@ CLIC_DIR = Path('D:/Datasets/CLIC')
 KODAK_DIR = Path('D:/Datasets/Kodak')
 
 # ImageNet dataset
-ILSVRC_DIR = Path('D:/Datasets/ILSVRC')
+IMAGENET_DIR = Path('D:/Datasets/imagenet')
 
 # Food-101 dataset
 FOOD101_DIR = Path('D:/Datasets/food-101')

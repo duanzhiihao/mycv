@@ -104,10 +104,10 @@ def augment_hsv(im, hgain=0.1, sgain=0.5, vgain=0.5):
 
 def random_hflip(im: Union[np.ndarray, Image.Image]):
     '''
-    Horizontal flip
+    Random horizontal flip with probability 0.5
 
     Args:
-        im: image
+        im: cv2 or PIL image
     '''
     flag = (torch.rand(1) > 0.5).item()
     if flag:
