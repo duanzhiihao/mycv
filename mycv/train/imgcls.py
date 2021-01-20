@@ -43,7 +43,7 @@ def train():
     cfg.img_size = 224
     cfg.input_norm = False
     # optimizer
-    cfg.lr = 0.01
+    cfg.lr = 0.001
     cfg.momentum = 0.9
     cfg.weight_decay = 0.0001
     cfg.nesterov = False
