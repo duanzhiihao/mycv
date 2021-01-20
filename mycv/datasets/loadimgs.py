@@ -66,13 +66,13 @@ def _get_imgpaths(datasets: list, verbose=True):
     if 'imagenet200' in datasets:
         if verbose:
             print('Loading imagenet mini200 dataset...')
-        from mycv.paths import ILSVRC_DIR
-        list_path = ILSVRC_DIR / 'ImageSets/CLS-LOC/train200_600.txt'
-        img_dir = 'Data/CLS-LOC/train'
+        from mycv.paths import IMAGENET_DIR
+        list_path = IMAGENET_DIR / 'annotations/train200_600.txt'
+        img_dir = 'train'
         assert list_path.exists(), f'Error: {list_path} does not exist.'
         lines = open(list_path, 'r').read().strip().split('\n')
         for l in lines:
-            impath = str(ILSVRC_DIR / img_dir / l.split()[0]) + '.JPEG'
+            impath = str(IMAGENET_DIR / img_dir / l.split()[0])
             img_paths.append(impath)
     assert len(img_paths) > 0, 'No image path loaded'
     return img_paths
@@ -180,7 +180,7 @@ def kodak_val(model: torch.nn.Module, input_norm=False, verbose=True, bar=False)
         # forward pass
         input_ = input_.unsqueeze(0).to(device=device)
         with torch.no_grad():
-            fake, probs = model.inference(input_)
+            fake, probs = model.forward_nic(input_)
         fake: torch.Tensor # should be between 0~1
         assert fake.shape == input_.shape and fake.dtype == input_.dtype
 

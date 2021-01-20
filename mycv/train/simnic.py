@@ -25,27 +25,33 @@ def train():
     parser.add_argument('--model',      type=str,  default='nlaic')
     parser.add_argument('--loss',       type=str,  default='mse', choices=['mse','msssim'])
     parser.add_argument('--lmbda',      type=float,default=32)
-    parser.add_argument('--batch_size', type=int,  default=12)
-    parser.add_argument('--optimizer',  type=str,  default='Adam', choices=['Adam', 'SGD'])
+    parser.add_argument('--batch_size', type=int,  default=16)
     parser.add_argument('--epochs',     type=int,  default=80)
-    parser.add_argument('--device',     type=int,  default=0)
+    parser.add_argument('--device',     type=int,  default=[0], nargs='+')
     parser.add_argument('--workers',    type=int,  default=4)
-    parser.add_argument('--wbmode',     type=str,  default='online')
+    parser.add_argument('--wbmode',     type=str,  default='disabled')
     cfg = parser.parse_args()
     # model
     cfg.img_size = 256
     cfg.input_norm = False
     # optimizer
-    cfg.lr = 5e-6
+    cfg.lr = 1e-5
     # lr scheduler
     cfg.lrf = 0.2 # min lr factor
     cfg.lr_warmup_epochs = 0
 
     # check arguments
-    epochs:     int = cfg.epochs
+    epochs: int = cfg.epochs
     # fix random seeds for reproducibility
     set_random_seeds(1)
     torch.backends.cudnn.benchmark = True
+    # device setting
+    assert torch.cuda.is_available()
+    for _id in cfg.device:
+        print(f'Using device {_id}:', torch.cuda.get_device_properties(_id))
+    device = torch.device(f'cuda:{cfg.device[0]}')
+    bs_each = cfg.batch_size // len(cfg.device)
+    print('Batch size on each single GPU =', bs_each, '\n')
 
     # Dataset
     print('Initializing Datasets and Dataloaders...')
@@ -63,45 +69,31 @@ def train():
         model = NLAIC(enable_bpp=True)
     else:
         raise NotImplementedError()
+    model = model.to(device)
 
     # set device
-    assert torch.cuda.is_available()
-    device = torch.device(f'cuda:0')
-    if cfg.device == 0:
-        print(f'using device {device}:', torch.cuda.get_device_properties(device))
-        model = model.to(device)
-    elif cfg.device == 4:
-        model = torch.nn.DataParallel(model, device_ids=[0,1,2,3])
-    else:
-        raise ValueError()
+    if len(cfg.device) > 1:
+        model = torch.nn.DataParallel(model, device_ids=cfg.device)
 
     # loss function
     mse_func = torch.nn.MSELoss(reduction='mean')
     msssim_func = MS_SSIM(max_val=1.0, reduction='mean')
 
     # optimizer
-    if cfg.optimizer == 'SGD':
-        optimizer = torch.optim.SGD(model.parameters(), lr=cfg.lr)
-    elif cfg.optimizer == 'Adam':
-        optimizer = torch.optim.Adam(model.parameters(), lr=cfg.lr)
-    else:
-        raise ValueError()
+    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.lr)
+    # optimizer = torch.optim.SGD(model.parameters(), lr=cfg.lr)
 
     log_parent = Path(f'runs/{cfg.project}')
     wb_id = None
-    results = defaultdict(int)
-
+    results = defaultdict(float)
     # new experiment
     run_name = increment_dir(dir_root=log_parent, name=cfg.model)
     log_dir = log_parent / run_name # wandb logging dir
     os.makedirs(log_dir, exist_ok=False)
     print(str(model), file=open(log_dir / 'model.txt', 'w'))
-    start_epoch = 0
-    cur_psnr = cur_msssim = cur_bpp = best_fitness = 0
+    start_epoch, best_fitness = 0, 0.0
 
     # initialize wandb
-    if cfg.dryrun:
-        os.environ["WANDB_MODE"] = "dryrun"
     wbrun = wandb.init(project=cfg.project, group=cfg.group, name=run_name, config=cfg,
                        dir='runs/', resume='allow', id=wb_id, mode=cfg.wbmode)
     cfg = wbrun.config
@@ -137,16 +129,15 @@ def train():
             # forward
             rec, probs = model(imgs)
             if cfg.loss == 'mse':
-                l_rec = mse_func(rec, imgs) * nB
+                l_rec = mse_func(rec, imgs)
             else:
                 raise NotImplementedError()
             if probs is not None:
                 p1, p2 = probs
-                l_bpp = cal_bpp(p1, nH*nW) + cal_bpp(p2, nH*nW)
+                l_bpp = cal_bpp(p1, nB*nH*nW) + cal_bpp(p2, nB*nH*nW)
             else:
                 l_bpp = torch.zeros(1, device=device)
             loss = cfg.lmbda * l_rec + 0.01 * l_bpp
-            # loss is averaged within image, sumed over batch, and sumed over gpus
             # backward, update
             loss.backward()
             optimizer.step()
@@ -156,13 +147,14 @@ def train():
 
             # logging
             cur_lr = optimizer.param_groups[0]['lr']
-            epoch_rec  = (epoch_rec*bi + l_rec.item()/nB) / (bi+1)
-            epoch_bpp  = (epoch_bpp*bi + l_bpp.item()/nB) / (bi+1)
-            epoch_loss = (epoch_loss*bi + loss.item()/nB) / (bi+1)
+            epoch_rec  = (epoch_rec*bi + l_rec.item()) / (bi+1)
+            epoch_bpp  = (epoch_bpp*bi + l_bpp.item()) / (bi+1)
+            epoch_loss = (epoch_loss*bi + loss.item()) / (bi+1)
             mem = torch.cuda.max_memory_allocated(device) / 1e9
             s = ('%-10s' * 2 + '%-10.4g' * 7) % (
                 f'{epoch}/{epochs-1}', f'{mem:.3g}G', cur_lr,
-                epoch_rec, epoch_bpp, epoch_loss, cur_psnr, cur_msssim, cur_bpp
+                epoch_rec, epoch_bpp, epoch_loss,
+                results['psnr'], results['msssim'], results['bpp']
             )
             pbar.set_description(s)
             torch.cuda.reset_peak_memory_stats()
@@ -171,9 +163,9 @@ def train():
             if bi % 100 == 0:
                 wbrun.log({
                     'general/lr': cur_lr,
-                    'metric/epoch_rec': epoch_rec,
-                    'metric/epoch_bpp': epoch_bpp,
-                    'metric/epoch_loss': epoch_loss,
+                    'train/epoch_rec': epoch_rec,
+                    'train/epoch_bpp': epoch_bpp,
+                    'train/epoch_loss': epoch_loss,
                 }, step=niter)
 
             # save output
@@ -185,27 +177,26 @@ def train():
                 _log_dic = {'general/epoch': epoch}
                 results = kodak_val(model, input_norm=cfg.input_norm, verbose=False)
                 _log_dic.update({'metric/plain_val_'+k: v for k,v in results.items()})
-                cur_psnr, cur_msssim, cur_bpp = [results[s] for s in ['psnr','msssim','bpp']]
                 # wandb log
                 wbrun.log(_log_dic, step=niter)
                 # Write evaluation results
-                res = s + '||' + '%10.4g'*3 % (results['psnr'],results['msssim'],results['bpp'])
+                _res = s + '||' + '%10.4g'*3 % (results['psnr'],results['msssim'],results['bpp'])
                 with open(log_dir / 'results.txt', 'a') as f:
-                    f.write(res + '\n')
+                    f.write(_res + '\n')
                 # save last checkpoint
                 checkpoint = {
                     'model'     : model.state_dict(),
                     'optimizer' : optimizer.state_dict(),
                     'scaler'    : None,
                     'epoch'     : epoch,
-                    'psnr'      : cur_psnr,
-                    'msssim'    : cur_msssim,
-                    'bpp'       : cur_bpp,
+                    'psnr'      : results['psnr'],
+                    'msssim'    : results['msssim'],
+                    'bpp'       : results['bpp'],
                 }
                 torch.save(checkpoint, log_dir / 'last.pt')
                 # save best checkpoint
-                if cur_msssim > best_fitness:
-                    best_fitness = cur_msssim
+                if results['msssim'] > best_fitness:
+                    best_fitness = results['msssim']
                     torch.save(checkpoint, log_dir / 'best.pt')
                 del checkpoint
             model.train()
@@ -227,12 +218,3 @@ def save_output(input_: torch.Tensor, output: torch.Tensor, save_path):
 
 if __name__ == '__main__':
     train()
-
-    # from mycv.models.cls.resnet import resnet50
-    # model = resnet50(num_classes=1000)
-    # weights = torch.load('weights/resnet50-19c8e357.pth')
-    # model.load_state_dict(weights)
-    # model = model.cuda()
-    # model.eval()
-    # results = imagenet_val(model, img_size=224, batch_size=64, workers=4)
-    # print(results['top1'])

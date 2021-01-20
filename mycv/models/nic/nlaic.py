@@ -70,7 +70,7 @@ class NLAIC(nn.Module):
         else:
             raise NotImplementedError()
 
-    def inference(self, imgs):
+    def forward_nic(self, imgs):
         assert not self.training
         rec, probs = self.forward(imgs)
         return rec, probs
