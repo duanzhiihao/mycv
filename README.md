@@ -8,6 +8,8 @@ A personal computer vision repository using pytorch
 ## Uninstall
 `conda develop --uninstall path/to/mycv`
 
+Notes: https://www.tablesgenerator.com/markdown_tables
+
 ## Imagenet experiments
 Resnet-50, imagenet200_600
 | Run     | lr    | Optimizer    | Plain best/last | EMA best/last |
