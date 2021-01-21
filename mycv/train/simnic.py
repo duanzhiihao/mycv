@@ -21,7 +21,7 @@ def train():
     parser = argparse.ArgumentParser()
     parser.add_argument('--project',    type=str,  default='imcoding')
     parser.add_argument('--group',      type=str,  default='default')
-    parser.add_argument('--datasets',   type=str,  default=['imagenet200'], nargs='+')
+    parser.add_argument('--datasets',   type=str,  default=['COCO','CLIC400'], nargs='+')
     parser.add_argument('--model',      type=str,  default='mini')
     parser.add_argument('--loss',       type=str,  default='mse', choices=['mse','msssim'])
     parser.add_argument('--lmbda',      type=float,default=32)
@@ -218,4 +218,5 @@ def save_output(input_: torch.Tensor, output: torch.Tensor, save_path):
 
 
 if __name__ == '__main__':
+    print()
     train()
