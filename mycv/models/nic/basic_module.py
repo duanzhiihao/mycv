@@ -22,9 +22,12 @@ class ResBlock(nn.Module):
         self.conv2 = conv2d(hidden, inout, ks, 1, padding=pad)
 
     def forward(self, x):
-        x1 = tnf.relu(self.conv1(x), inplace=True)
-        x1 = self.conv2(x1)
-        return x + x1
+        identity = x
+        x = tnf.relu(self.conv1(x), inplace=True)
+        x = self.conv2(x)
+        out = x + identity
+        # out = tnf.relu(out)
+        return out
 
 
 # here use embedded gaussian

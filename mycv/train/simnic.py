@@ -21,21 +21,21 @@ def train():
     parser = argparse.ArgumentParser()
     parser.add_argument('--project',    type=str,  default='imcoding')
     parser.add_argument('--group',      type=str,  default='default')
-    parser.add_argument('--datasets',   type=str,  default=['NIC'], nargs='+')
+    parser.add_argument('--datasets',   type=str,  default=['imagenet200'], nargs='+')
     parser.add_argument('--model',      type=str,  default='mini')
     parser.add_argument('--loss',       type=str,  default='mse', choices=['mse','msssim'])
     parser.add_argument('--lmbda',      type=float,default=32)
-    parser.add_argument('--batch_size', type=int,  default=32)
+    parser.add_argument('--batch_size', type=int,  default=16)
     parser.add_argument('--epochs',     type=int,  default=80)
     parser.add_argument('--device',     type=int,  default=[0], nargs='+')
-    parser.add_argument('--workers',    type=int,  default=4)
+    parser.add_argument('--workers',    type=int,  default=2)
     parser.add_argument('--wbmode',     type=str,  default='disabled')
     cfg = parser.parse_args()
     # model
     cfg.img_size = 256
     cfg.input_norm = False
     # optimizer
-    cfg.lr = 1e-5
+    cfg.lr = 5e-5
     # lr scheduler
     cfg.lrf = 0.2 # min lr factor
     cfg.lr_warmup_epochs = 0
@@ -137,7 +137,7 @@ def train():
                 l_bpp = cal_bpp(p1, nB*nH*nW) + cal_bpp(p2, nB*nH*nW)
             else:
                 l_bpp = torch.zeros(1, device=device)
-            loss = cfg.lmbda * l_rec + l_bpp
+            loss = cfg.lmbda * l_rec + 0.01*l_bpp
             # backward, update
             loss.backward()
             optimizer.step()

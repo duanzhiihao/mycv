@@ -26,6 +26,27 @@ def is_image(im, cv2_ok=True, pil_ok=True):
     return flag
 
 
+def save_tensor_images(images, save_path: str):
+    shape = images[0].shape
+    for i, img in enumerate(images):
+        assert img.dtype == torch.float and img.shape == shape
+        images[i] = torch.clamp(img.detach().cpu(), min=0, max=1)
+    if len(images) == 1:
+        im = images[0]
+    elif len(images) == 2:
+        im = torch.cat(images, dim=2)
+    elif len(images) == 4:
+        row1 = torch.cat(images[:2], dim=2)
+        row2 = torch.cat(images[2:], dim=2)
+        im = torch.cat([row1, row2], dim=1)
+    else:
+        raise NotImplementedError(f'Get {len(images)} images to save, not supported.')
+    im = im.permute(1,2,0) * 255
+    im = im.to(dtype=torch.uint8).numpy()
+    im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
+    cv2.imwrite(str(save_path), im)
+
+
 def imread_tensor(img_path: str, div=16, color='RGB'):
     """ Read image and convert to tensor
 
