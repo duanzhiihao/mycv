@@ -19,9 +19,9 @@ class MiniNIC(nn.Module):
         if not enable_bpp:
             return
         self.factorized_entropy_func = Entropy_bottleneck(96) # 4.1k
-        self.hyper_dec = Hyper_Dec(96, 128, nums=[2,2,1,1]) # 2.1M
-        self.p = P_Model(128, num=2) # 885k
-        self.context = Complex_context(ch=128, nums=[3,2]) # 402k
+        self.hyper_dec = Hyper_Dec(96, 192, nums=[2,2,1,1]) # 2.1M
+        self.p = P_Model(192, num=2) # 885k
+        self.context = Complex_context(ch=192, nums=[3,2]) # 402k
 
     def forward(self, x):
         assert x.dim() == 4 and x.shape[1] == 3
@@ -70,7 +70,7 @@ class MiniNIC(nn.Module):
         else:
             raise NotImplementedError()
 
-    def inference(self, imgs):
+    def forward_nic(self, imgs):
         assert not self.training
         rec, probs = self.forward(imgs)
         return rec, probs
@@ -79,9 +79,9 @@ class MiniNIC(nn.Module):
 class miniEnc(nn.Module):
     """ mini NLAIC encoder
     """
-    def __init__(self, input_ch=3, channels=[32, 64, 128], hyper=False):
+    def __init__(self, input_ch=3, channels=[32, 64, 128, 192], hyper=False):
         super().__init__()
-        c0, c1, c2 = channels
+        c0, c1, c2, c3 = channels
         self.hyper = hyper
 
         self.trunk = nn.Sequential(
@@ -89,30 +89,30 @@ class miniEnc(nn.Module):
             *[ResBlock(c0) for _ in range(2)],
             # 2x
             conv2d(c0, c1, 5, 2, padding=2),
-            *[ResBlock(c1) for _ in range(2)],
+            *[ResBlock(c1) for _ in range(3)],
             # 4x
             conv2d(c1, c2, 5, 2, padding=2),
-            *[ResBlock(c2) for _ in range(3)],
+            *[ResBlock(c2) for _ in range(4)],
             # 8x
-            conv2d(c2, c2, 5, 2, padding=2),
-            *[ResBlock(c2) for _ in range(3)],
+            conv2d(c2, c3, 5, 2, padding=2),
+            *[ResBlock(c3) for _ in range(5)],
             # 16x
         )
         if not hyper:
             return
         # hyper
         self.trunk6 = nn.Sequential(
-            *[ResBlock(c2) for _ in range(2)],
-            conv2d(c2, c2, 5, 2, 2)
+            *[ResBlock(c3) for _ in range(2)],
+            conv2d(c3, c3, 5, 2, 2)
         )
         self.trunk7 = nn.Sequential(
-            *[ResBlock(c2) for _ in range(3)],
-            conv2d(c2, c2, 5, 2, 2)
+            *[ResBlock(c3) for _ in range(2)],
+            conv2d(c3, c3, 5, 2, 2)
         )
         self.trunk8 = nn.Sequential(
-            *[ResBlock(c2) for _ in range(3)],
+            *[ResBlock(c3) for _ in range(2)],
         )
-        self.conv2 = conv2d(c2, 96, 3, 1, 1)
+        self.conv2 = conv2d(c3, 96, 3, 1, 1)
 
     def forward(self, x):
         x_comp = self.trunk(x)
@@ -120,7 +120,7 @@ class miniEnc(nn.Module):
             return x_comp, None
         x = self.trunk6(x_comp)
         x = self.trunk7(x)
-        x = self.trunk8(x)
+        x = self.trunk8(x) + x
         x_prob = self.conv2(x)
         return x_comp, x_prob
 
@@ -128,12 +128,12 @@ class miniEnc(nn.Module):
 class miniDec(nn.Module):
     """ mini NLAIC decoder
     """
-    def __init__(self, channels=[128,128,64,64,32], input_features=3):
+    def __init__(self, channels=[192,160,128,96,64], input_features=3):
         super().__init__()
         c4, c3, c2, c1, c0 = channels
-        self.m1 = nn.Sequential(
-            *[ResBlock(c4) for _ in range(3)]
-        )
+        # self.m1 = nn.Sequential(
+        #     *[ResBlock(c4) for _ in range(3)]
+        # )
         self.up1 = nn.Sequential(
             nn.ConvTranspose2d(c4, c3, 5, 2, 2, 1),
             *[ResBlock(c3) for _ in range(3)]
@@ -156,7 +156,7 @@ class miniDec(nn.Module):
 
     def forward(self, x):
         assert x.dim() == 4 and x.shape[1] == self._feat_ch
-        x = self.m1(x)
+        # x = self.m1(x)
         x = self.up1(x) # 0.09 0.07
         x = self.up2(x) # 0.39 0.34
         x = self.up3(x) # 0.96 0.86
