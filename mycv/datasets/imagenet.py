@@ -65,7 +65,7 @@ class ImageNetCls(torch.utils.data.Dataset):
     def __getitem__(self, index: int):
         # image
         impath = self._img_paths[index]
-        img = Image.open(impath)
+        img = Image.open(impath).convert('RGB')
         # label
         label = self._labels[index]
         if self.split == 'train': # sanity check
@@ -88,8 +88,6 @@ class ImageNetCls(torch.utils.data.Dataset):
         else:
             raise ValueError(f'{self.split} is not supported.')
 
-        if im.shape[0] == 1:
-            im = im.expand(3, -1, -1)
         assert im.shape == (3, img_size, img_size), f'{im.shape}, {impath}'
 
         # normalize such that mean = 0 and std = 1

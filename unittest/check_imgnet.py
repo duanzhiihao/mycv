@@ -6,7 +6,7 @@ from torch.utils.data.dataset import Dataset
 from torch.utils.data.dataloader import DataLoader
 import torchvision.transforms.functional as tvf
 
-from mycv.paths import ILSVRC_DIR
+from mycv.paths import IMAGENET_DIR
 
 class Check(Dataset):
     def __init__(self, img_paths) -> None:
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # imagenet root
-    root = Path(ILSVRC_DIR)
+    root = Path(IMAGENET_DIR)
 
     # check training set
     lines = open(root / 'ImageSets/CLS-LOC/train_cls.txt', 'r').read().strip().split('\n')
