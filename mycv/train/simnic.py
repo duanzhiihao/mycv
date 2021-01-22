@@ -24,9 +24,9 @@ def train():
     parser.add_argument('--datasets',   type=str,  default=['COCO','CLIC400'], nargs='+')
     parser.add_argument('--model',      type=str,  default='mini')
     parser.add_argument('--loss',       type=str,  default='mse', choices=['mse','msssim'])
-    parser.add_argument('--lmbda',      type=float,default=32)
+    parser.add_argument('--lmbda',      type=float,default=16)
     parser.add_argument('--batch_size', type=int,  default=16)
-    parser.add_argument('--epochs',     type=int,  default=80)
+    parser.add_argument('--epochs',     type=int,  default=20)
     parser.add_argument('--device',     type=int,  default=[0], nargs='+')
     parser.add_argument('--workers',    type=int,  default=2)
     parser.add_argument('--wbmode',     type=str,  default='disabled')
@@ -196,8 +196,8 @@ def train():
                 }
                 torch.save(checkpoint, log_dir / 'last.pt')
                 # save best checkpoint
-                if results['msssim'] > best_fitness:
-                    best_fitness = results['msssim']
+                if results['psnr'] > best_fitness:
+                    best_fitness = results['psnr']
                     torch.save(checkpoint, log_dir / 'best.pt')
                 del checkpoint
             model.train()
