@@ -209,8 +209,8 @@ def kodak_val(model: torch.nn.Module, input_norm=False, verbose=True, bar=False)
         bpp_all.append(bpp)
     # average over all images
     msssim = sum(msssim_all) / len(img_paths)
-    psnr   = sum(psnr_all) / len(img_paths)
-    bpp    = sum(bpp_all) / len(img_paths)
+    psnr   = sum(psnr_all)   / len(img_paths)
+    bpp    = sum(bpp_all)    / len(img_paths)
     results = {
         'psnr': psnr,
         'msssim': msssim,
@@ -232,9 +232,9 @@ if __name__ == "__main__":
     #         plt.imshow(im); plt.show()
 
     from mycv.models.nic.mini import MiniNIC
-    from mycv.paths import WEIGHTS_DIR
-    model = MiniNIC()
-    checkpoint = torch.load(WEIGHTS_DIR / 'miniMSE.pt')
+    from mycv.paths import MYCV_DIR
+    model = MiniNIC(enable_bpp=True)
+    checkpoint = torch.load(MYCV_DIR / 'runs/imcoding/mini_6/last.pt')
     model.load_state_dict(checkpoint['model'])
     model = model.cuda()
     model.eval()
