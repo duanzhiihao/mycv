@@ -183,11 +183,12 @@ if __name__ == "__main__":
     #     imgs = imgs
 
     from mycv.models.cls.resnet import resnet50
-    from mycv.paths import WEIGHTS_DIR
-    model = resnet50(num_classes=1000)
-    model.load_state_dict(torch.load(WEIGHTS_DIR / 'resnet50-19c8e357.pth'))
+    from mycv.paths import WEIGHTS_DIR, MYCV_DIR
+    model = resnet50(num_classes=200)
+    # model.load_state_dict(torch.load(WEIGHTS_DIR / 'resnet50-19c8e357.pth'))
+    model.load_state_dict(torch.load(MYCV_DIR / 'runs/imagenet/res50_1/best.pt')['model'])
     model = model.cuda()
     model.eval()
-    results = imagenet_val(model, split='val',
-                img_size=224, batch_size=64, workers=8, input_norm=True)
+    results = imagenet_val(model, split='val200_600',
+                img_size=224, batch_size=64, workers=8, input_norm=False)
     print(results)

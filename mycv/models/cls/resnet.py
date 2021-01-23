@@ -121,7 +121,7 @@ class ResNet(nn.Module):
         x4 = self.layer4(x3) # x: [b, 2048, H/32, W/32]
 
         # x = self.avgpool(x4) # x: [b, 2048, 1, 1]
-        x = tnf.adaptive_avg_pool2d(x, output_size=(1,1))
+        x = tnf.adaptive_avg_pool2d(x4, output_size=(1,1))
         x = torch.flatten(x, 1)
         x = self.fc(x) 
         self.cache = [x1, x2, x3, x4]
