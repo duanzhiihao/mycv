@@ -17,9 +17,10 @@ class Check(Dataset):
 
     def __getitem__(self, index):
         impath = self.img_paths[index]
-        img = Image.open(impath)
+        img = Image.open(impath).convert('RGB')
+        h, w = img.height, img.width
         im = tvf.to_tensor(img)
-        assert im.dim() == 3 and im.shape[0] in {1, 3}
+        assert im.shape == (3, h, w), f'{im.shape} {impath}'
         return 0
 
 def check_images(img_paths, workers=4):
@@ -31,26 +32,23 @@ def check_images(img_paths, workers=4):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--workers', type=int)
+    parser.add_argument('--workers', type=int, required=True)
     args = parser.parse_args()
 
     # imagenet root
     root = Path(IMAGENET_DIR)
 
     # check training set
-    lines = open(root / 'ImageSets/CLS-LOC/train_cls.txt', 'r').read().strip().split('\n')
-    img_paths = [root / f'Data/CLS-LOC/train/{s.split()[0]}' for s in lines]
-    img_paths = [str(s)+'.JPEG' for s in img_paths]
+    lines = open(root / 'annotations/train.txt', 'r').read().strip().split('\n')
+    img_paths = [root / f'train/{s.split()[0]}' for s in lines]
     print(f'Checking imagenet training set... total {len(img_paths)} images')
     check_images(img_paths, workers=args.workers)
 
     # check val set
-    lines = open(root / 'ImageSets/CLS-LOC/val.txt', 'r').read().strip().split('\n')
-    img_paths = [root / f'Data/CLS-LOC/val/{s.split()[0]}' for s in lines]
-    img_paths = [str(s)+'.JPEG' for s in img_paths]
+    lines = open(root / 'annotations/val.txt', 'r').read().strip().split('\n')
+    img_paths = [root / f'val/{s.split()[0]}' for s in lines]
     print(f'Checking imagenet validation set... total {len(img_paths)} images')
     check_images(img_paths, workers=args.workers)
 
     # check labels
-    assert (root / 'Annotations' / 'cls_val_real.json').exists()
-    assert (root / 'Annotations' / 'cls_val.txt').exists()
+    assert (root / 'annotations' / 'val_real.json').exists()
