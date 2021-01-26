@@ -27,20 +27,22 @@ def is_image(im, cv2_ok=True, pil_ok=True):
 
 
 def save_tensor_images(images, save_path: str):
-    shape = images[0].shape
-    for i, img in enumerate(images):
-        assert img.dtype == torch.float and img.shape == shape
-        images[i] = torch.clamp(img.detach().cpu(), min=0, max=1)
-    if len(images) == 1:
-        im = images[0]
-    elif len(images) == 2:
-        im = torch.cat(images, dim=2)
-    elif len(images) == 4:
-        row1 = torch.cat(images[:2], dim=2)
-        row2 = torch.cat(images[2:], dim=2)
+    assert isinstance(images, (list, torch.Tensor))
+    imglist = []
+    for img in images:
+        assert img.dtype == torch.float and img.dim() == 3
+        im = torch.clamp(img.detach().cpu(), min=0, max=1)
+        imglist.append(im)
+    if len(imglist) == 1:
+        im = imglist[0]
+    elif len(imglist) == 2:
+        im = torch.cat(imglist, dim=2)
+    elif len(imglist) == 4:
+        row1 = torch.cat(imglist[:2], dim=2)
+        row2 = torch.cat(imglist[2:], dim=2)
         im = torch.cat([row1, row2], dim=1)
     else:
-        raise NotImplementedError(f'Get {len(images)} images to save, not supported.')
+        raise NotImplementedError(f'Get {len(imglist)} images to save, not supported.')
     im = im.permute(1,2,0) * 255
     im = im.to(dtype=torch.uint8).numpy()
     im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
