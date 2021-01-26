@@ -84,7 +84,6 @@ class LoadImages(torch.utils.data.Dataset):
     def __init__(self, datasets=['COCO','CLIC'], img_size=256, input_norm=False,
                  verbose=True):
         assert isinstance(img_size, int)
-
         self.img_paths = _get_imgpaths(datasets, verbose)
         self.img_size  = img_size
         self._input_norm = input_norm
@@ -122,12 +121,12 @@ class LoadImages(torch.utils.data.Dataset):
         r = lambda: torch.rand(1).item()
         if r() > 0.5:
             im = cv2.flip(im, 1) # horizontal flip
-        # if r() > 0.5:
-        #     im = cv2.flip(im, 0) # vertical flip
-        # if r() > 0.5:
-        #     im = cv2.rotate(im, cv2.ROTATE_90_CLOCKWISE)
-        # else:
-        #     im = cv2.rotate(im, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        if r() > 0.5:
+            im = cv2.flip(im, 0) # vertical flip
+        if r() > 0.5:
+            im = cv2.rotate(im, cv2.ROTATE_90_CLOCKWISE)
+        else:
+            im = cv2.rotate(im, cv2.ROTATE_90_COUNTERCLOCKWISE)
         return im
 
 
