@@ -5,13 +5,15 @@ from pathlib import Path
 import argparse
 from tqdm import tqdm
 from collections import defaultdict
+import wandb
+import matplotlib.pyplot as plt
 import torch
 import torch.cuda.amp as amp
 from torch.optim.lr_scheduler import LambdaLR
-import wandb
 
 from mycv.utils.general import increment_dir
 from mycv.utils.torch_utils import set_random_seeds, ModelEMA, warmup_cosine, is_parallel
+from mycv.utils.image import save_tensor_images
 from mycv.datasets.imagenet import ImageNetCls, imagenet_val
 
 
@@ -35,8 +37,9 @@ def train():
     parser.add_argument('--amp',        type=bool, default=True)
     parser.add_argument('--ema',        type=bool, default=True)
     parser.add_argument('--epochs',     type=int,  default=100)
+    parser.add_argument('--study',      type=bool, default=False)
     parser.add_argument('--device',     type=int,  default=[0], nargs='+')
-    parser.add_argument('--workers',    type=int,  default=4)
+    parser.add_argument('--workers',    type=int,  default=6)
     parser.add_argument('--wbmode',     type=str,  default='disabled')
     cfg = parser.parse_args()
     # model
@@ -185,6 +188,8 @@ def train():
         print('\n' + pbar_title) # title
         pbar = tqdm(enumerate(trainloader), total=len(trainloader))
         for i, (imgs, labels) in pbar:
+            niter = epoch * len(trainloader) + i
+
             imgs = imgs.to(device=device)
             labels = labels.to(device=device)
             nB, nC, nH, nW = imgs.shape
@@ -196,6 +201,10 @@ def train():
                 # loss is averaged within image, sumed over batch, and sumed over gpus
             # backward, update
             scaler.scale(loss).backward()
+
+            if cfg.study and niter % 800 == 0:
+                log_gradients(model, log_dir / 'gradients', niter)
+
             scaler.step(optimizer)
             scaler.update()
             optimizer.zero_grad()
@@ -205,7 +214,6 @@ def train():
             scheduler.step()
 
             # logging
-            niter = epoch * len(trainloader) + i
             cur_lr = optimizer.param_groups[0]['lr']
             loss = loss.detach().cpu().item()
             acc = cal_acc(p.detach(), labels)
@@ -220,6 +228,7 @@ def train():
             torch.cuda.reset_peak_memory_stats()
             # Weights & Biases logging
             if niter % 100 == 0:
+                save_tensor_images(imgs[:4], save_path=log_dir / 'imgs.png')
                 wbrun.log({
                     'general/lr': cur_lr,
                     'loss/train_loss': train_loss,
@@ -290,7 +299,45 @@ def get_model(name, num_class):
     return model
 
 
+def log_gradients(model, save_dir: Path, iter_num: int):
+    if not save_dir.is_dir():
+        os.mkdir(save_dir)
+    bnw, bnb, cvw, cvb = [], [], [], []
+    for k,v in model.named_parameters():
+        if 'bn' in k:
+            if '.weight' in k:
+                bnw.append(_amplitude(v.grad.data))
+            else:
+                assert '.bias' in k
+                bnb.append(_amplitude(v.grad.data))
+        else:
+            if '.weight' in k:
+                cvw.append(_amplitude(v.grad.data))
+            else:
+                assert '.bias' in k
+                cvb.append(_amplitude(v.grad.data))
+    # save 3 figures
+    iter_str = str(iter_num).zfill(6)
+    _save_fig(bnw, save_dir / f'bn_weight_{iter_str}.png', 'BN weight')
+    _save_fig(bnb, save_dir / f'bn_bias_{iter_str}.png', 'BN bias')
+    _save_fig(cvw, save_dir / f'conv_weight_{iter_str}.png', 'Conv weight')
+    _save_fig(cvb, save_dir / f'conv_bias_{iter_str}.png', 'Conv bias')
+
+def _amplitude(g):
+    return g.abs().mean().item()
+
+def _save_fig(data, fname, title='Gradients vs. layer'):
+    plt.clf()
+    plt.figure()
+    x = list(range(len(data)))
+    plt.bar(x, data)
+    plt.title(title)
+    plt.xlabel('Layer'); plt.ylabel('Gradient mean abs')
+    plt.savefig(fname)
+
+
 if __name__ == '__main__':
+    print()
     train()
 
     # from mycv.models.cls.resnet import resnet50
