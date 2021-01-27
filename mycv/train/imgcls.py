@@ -286,6 +286,9 @@ def get_model(name, num_class):
     elif name == 'res101':
         from mycv.models.cls.resnet import resnet101
         model = resnet101(num_classes=num_class)
+    elif name == 'res152':
+        from mycv.models.cls.resnet import resnet152
+        model = resnet152(num_classes=num_class)
     elif name.startswith('yolov5'):
         from mycv.models.yolov5.cls import YOLOv5Cls
         assert name[-1] in ['s', 'm', 'l']
@@ -303,37 +306,47 @@ def log_gradients(model, save_dir: Path, iter_num: int):
     if not save_dir.is_dir():
         os.mkdir(save_dir)
     bnw, bnb, cvw, cvb = [], [], [], []
+    param_names = []
     for k,v in model.named_parameters():
+        param_names.append(k)
         if 'bn' in k:
             if '.weight' in k:
-                bnw.append(_amplitude(v.grad.data))
+                bnw.append((k, _amplitude(v.grad.data)))
             else:
                 assert '.bias' in k
-                bnb.append(_amplitude(v.grad.data))
+                bnb.append((k, _amplitude(v.grad.data)))
         else:
             if '.weight' in k:
-                cvw.append(_amplitude(v.grad.data))
+                cvw.append((k, _amplitude(v.grad.data)))
             else:
                 assert '.bias' in k
-                cvb.append(_amplitude(v.grad.data))
+                cvb.append((k, _amplitude(v.grad.data)))
     # save 3 figures
     iter_str = str(iter_num).zfill(6)
-    _save_fig(bnw, save_dir / f'bn_weight_{iter_str}.png', 'BN weight')
-    _save_fig(bnb, save_dir / f'bn_bias_{iter_str}.png', 'BN bias')
-    _save_fig(cvw, save_dir / f'conv_weight_{iter_str}.png', 'Conv weight')
-    _save_fig(cvb, save_dir / f'conv_bias_{iter_str}.png', 'Conv bias')
+    _save_fig(bnw, save_dir / f'bn_weight_{iter_str}.png', 'BN_weight')
+    _save_fig(bnb, save_dir / f'bn_bias_{iter_str}.png', 'BN_bias')
+    _save_fig(cvw, save_dir / f'conv_weight_{iter_str}.png', 'Conv_weight')
+    _save_fig(cvb, save_dir / f'conv_bias_{iter_str}.png', 'Conv_bias')
 
 def _amplitude(g):
     return g.abs().mean().item()
 
-def _save_fig(data, fname, title='Gradients vs. layer'):
+def _save_fig(data, fpath, title='Gradients_vs_layer'):
+    names = [t[0] for t in data]
+    data = [t[1] for t in data]
     plt.clf()
     plt.figure()
     x = list(range(len(data)))
     plt.bar(x, data)
     plt.title(title)
     plt.xlabel('Layer'); plt.ylabel('Gradient mean abs')
-    plt.savefig(fname)
+    plt.savefig(fpath)
+
+    assert ' ' not in title
+    txt_path = fpath.parent / f'{title}.txt'
+    with open(txt_path, 'w') as f:
+        for str_ in names:
+            print(str_, file=f)
 
 
 if __name__ == '__main__':
