@@ -47,7 +47,7 @@ class CSP(nn.Module):
     }
     def __init__(self, model='s', num_class=1000):
         super().__init__()
-        w, d = YOLOv5Cls.setting[model]
+        w, d = CSP.setting[model]
         self.backbone = CustomBackbone(w, d, in_ch=3)
         channels = self.backbone.channels
         self.fc = nn.Linear(channels[-1], num_class)
