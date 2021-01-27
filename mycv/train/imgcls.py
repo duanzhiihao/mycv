@@ -6,6 +6,7 @@ import argparse
 from tqdm import tqdm
 from collections import defaultdict
 import wandb
+import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import torch.cuda.amp as amp
@@ -176,6 +177,8 @@ def train():
     if len(cfg.device) > 1:
         model = torch.nn.DataParallel(model, device_ids=cfg.device)
 
+    glog = gradient_logger(model, save_dir=log_dir)
+
     # ======================== start training ========================
     pbar_title = ('%-10s' * 7) % (
         'Epoch', 'GPU_mem', 'lr', 'tr_loss', 'tr_acc', 'top1', 'top1_real',
@@ -203,7 +206,8 @@ def train():
             scaler.scale(loss).backward()
 
             if cfg.study and niter % 800 == 0:
-                log_gradients(model, log_dir / 'gradients', niter)
+                # log_gradients(model, log_dir / 'gradients', niter)
+                glog.log(model)
 
             scaler.step(optimizer)
             scaler.update()
@@ -301,6 +305,30 @@ def get_model(name, num_class):
         raise ValueError()
     return model
 
+class gradient_logger:
+    def __init__(self, model, save_dir) -> None:
+        self.names = []
+        row = []
+        for k,v in model.named_parameters():
+            self.names.append(k)
+            row.append(_amplitude(v.grad.data) if v.grad is not None else 0)
+        self.table = torch.Tensor(row).unsqueeze(0)
+        self.save_dir = save_dir
+        # save weight labels
+        with open(self.save_dir / 'names.txt', 'w') as f:
+            for str_ in self.names:
+                print(str_, file=f)
+    def log(self, model):
+        row = []
+        for i, (k,v) in enumerate(model.named_parameters()):
+            assert k == self.names[i]
+            row.append(_amplitude(v.grad.data))
+        row = torch.Tensor(row).unsqueeze(0)
+        self.table = torch.cat([self.table, row], dim=0)
+        # save txt
+        _table = self.table.numpy()
+        _table = np.round(_table, 2)
+        np.savetxt(self.save_dir / 'gradients.txt', _table, fmt='%6s')
 
 def log_gradients(model, save_dir: Path, iter_num: int):
     if not save_dir.is_dir():
