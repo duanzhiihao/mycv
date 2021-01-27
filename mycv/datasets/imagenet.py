@@ -114,6 +114,7 @@ def imagenet_val(model: torch.nn.Module, split='val', testloader=None,
     assert split.startswith('val')
     model.eval()
     device = next(model.parameters()).device
+    _forward = getattr(model, 'forward_cls', model.forward)
 
     # test set
     if testloader is None:
@@ -130,7 +131,6 @@ def imagenet_val(model: torch.nn.Module, split='val', testloader=None,
         # _debug(imgs)
         imgs = imgs.to(device=device)
         with torch.no_grad():
-            _forward = getattr(model, 'forward_cls', model.forward)
             p = _forward(imgs)
         assert p.dim() == 2 and labels.max().item() < p.shape[1]
         _, p = torch.max(p, dim=1)
