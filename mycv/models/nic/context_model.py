@@ -42,6 +42,7 @@ class MaskConv3d(nn.Conv3d):
 
 class Context(nn.Module):
     def __init__(self):
+        raise DeprecationWarning()
         super(Context, self).__init__()
         self.conv1 = MaskConv3d('A', 1, 24, 5, 1, 2)
 
@@ -63,6 +64,7 @@ class Context(nn.Module):
 
 class Maskb_resblock(nn.Module):
     def __init__(self,in_channel,out_channel,kernel_size,stride,padding):
+        raise DeprecationWarning()
         super(Maskb_resblock,self).__init__()
         self.in_ch = int(in_channel)
         self.out_ch = int(out_channel)
@@ -82,6 +84,7 @@ class Maskb_resblock(nn.Module):
 
 class Resblock_3D(nn.Module):
     def __init__(self,in_channel,out_channel,kernel_size,stride,padding):
+        raise DeprecationWarning()
         super(Resblock_3D,self).__init__()
         self.in_ch = int(in_channel)
         self.out_ch = int(out_channel)
@@ -105,6 +108,7 @@ class Complex_context(nn.Module):
     context
     '''
     def __init__(self, ch=192, nums=[4,3]):
+        raise DeprecationWarning()
         super(Complex_context, self).__init__()
         self.hyper_to_main = conv2d(ch*2, ch, 3, 1, 1)
         self.conv1 = MaskConv3d('A', 1, 24, 5, 1, 2)
@@ -139,3 +143,26 @@ class P_Model(nn.Module):
     def forward(self,x):
         x = self.context_p(x)
         return x
+
+
+class Weighted_Gaussian(nn.Module):
+    def __init__(self, M):
+        super(Weighted_Gaussian, self).__init__()
+        self.conv1 = MaskConv3d('A', 1, 24, 11, 1, 5)
+        self.conv2 = nn.Sequential(
+            nn.Conv3d(25, 48, 1, 1, 0),
+            nn.ReLU(),
+            nn.Conv3d(48, 96, 1, 1, 0),
+            nn.ReLU(),
+            nn.Conv3d(96, 9, 1, 1, 0)
+        )
+        self.conv3 = nn.Conv2d(M*2, M, 3, 1, 1)
+        self.gaussin_entropy_func = Distribution_for_entropy2()
+
+    def forward(self, x, hyper):
+        x = torch.unsqueeze(x, dim=1)
+        hyper = torch.unsqueeze(self.conv3(hyper), dim=1)
+        x1 = self.conv1(x)
+        output = self.conv2(torch.cat((x1, hyper), dim=1))
+        p3 = self.gaussin_entropy_func(torch.squeeze(x, dim=1), output)
+        return p3 #, output

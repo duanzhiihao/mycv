@@ -5,6 +5,7 @@ from torch.nn.parameter import Parameter
 import torch.nn.functional as f
 from torch.distributions.uniform import Uniform
 
+
 class Low_bound(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x):
@@ -23,7 +24,7 @@ class Low_bound(torch.autograd.Function):
 
 
 class Entropy_bottleneck(nn.Module):
-    def __init__(self, channel, init_scale=10, filters = (3,3,3), likelihood_bound=1e-6,
+    def __init__(self, channel, init_scale=10, filters=(3,3,3), likelihood_bound=1e-6,
                  tail_mass=1e-9, optimize_integer_offset=True):
         super(Entropy_bottleneck, self).__init__()
 
@@ -124,6 +125,7 @@ class _UniverseQuant(torch.autograd.Function):
             -0.5*torch.ones(x.size())*(2**b), 0.5*torch.ones(x.size())*(2**b)
         ).sample().cuda()
         return torch.round(x+uniform_distribution)-uniform_distribution
+
     @staticmethod
     def backward(ctx, g):
         return g

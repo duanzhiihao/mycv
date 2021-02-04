@@ -3,7 +3,7 @@ import torch.nn as nn
 
 from mycv.models.nic.basic_module import conv2d, ResBlock, Non_local_Block, UniverseQuant
 from mycv.models.nic.factorized_entropy_model import Entropy_bottleneck
-from mycv.models.nic.context_model import P_Model, Complex_context
+from mycv.models.nic.context_model import P_Model, Weighted_Gaussian
 
 
 class NLAIC(nn.Module):
@@ -27,7 +27,7 @@ class NLAIC(nn.Module):
         self.factorized_entropy_func = Entropy_bottleneck(N2) # 5.5k
         self.hyper_dec = Hyper_Dec(N2, M) # 8.8M
         self.p = P_Model(M) # 2.6M
-        self.context = Complex_context() # 806k
+        self.context = Weighted_Gaussian(M) # 806k
 
     def forward(self, x):
         x, xhyp = self.encoder(x) # 3GB
@@ -39,10 +39,10 @@ class NLAIC(nn.Module):
         xq2, xp2 = self.factorized_entropy_func(xhyp)
         x3 = self.hyper_dec(xq2)
         hyper_dec = self.p(x3)
-        xp1 = self.context(xq, hyper_dec) # 2GB
+        xp3 = self.context(xq, hyper_dec) # 2GB
 
         rec = self.decoder(xq) # 3GB
-        return rec, (xp1, xp2)
+        return rec, (xp2, xp3)
 
     def encode(self, x):
         '''
@@ -73,6 +73,7 @@ class NLAIC(nn.Module):
     def forward_nic(self, imgs):
         assert not self.training
         rec, probs = self.forward(imgs)
+        rec = rec.clamp_(min=0, max=1)
         return rec, probs
 
 
