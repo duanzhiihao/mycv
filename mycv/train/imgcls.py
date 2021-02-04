@@ -47,7 +47,7 @@ def train():
     cfg.img_size = 224
     cfg.input_norm = False
     # optimizer
-    cfg.lr = 0.001
+    cfg.lr = 0.01
     cfg.momentum = 0.9
     cfg.weight_decay = 0.0001
     cfg.nesterov = False
@@ -200,7 +200,7 @@ def train():
             # forward
             with amp.autocast(enabled=cfg.amp):
                 p = model(imgs)
-                loss = loss_func(p, labels) * nB
+                loss = loss_func(p, labels)
                 # loss is averaged within image, sumed over batch, and sumed over gpus
             # backward, update
             scaler.scale(loss).backward()
@@ -221,7 +221,7 @@ def train():
             cur_lr = optimizer.param_groups[0]['lr']
             loss = loss.detach().cpu().item()
             acc = cal_acc(p.detach(), labels)
-            train_loss = (train_loss*i + loss/nB) / (i+1)
+            train_loss = (train_loss*i + loss) / (i+1)
             train_acc = (train_acc*i + acc) / (i+1)
             mem = torch.cuda.max_memory_allocated(device) / 1e9
             s = ('%-10s' * 2 + '%-10.4g' * 5) % (
