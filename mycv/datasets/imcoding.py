@@ -134,14 +134,15 @@ def _imread(img_path):
     im = cv2.imread(img_path)
     im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
 
-    input_ = imgUtils.pad_divisible(im, div=16)
+    input_ = imgUtils.pad_divisible(im, div=64)
     input_ = torch.from_numpy(input_).permute(2, 0, 1).float() / 255.0 # C,H,W
     # 0~1, float32, RGB, HWC
     input_: torch.Tensor
     return input_, im
 
 
-def kodak_val(model: torch.nn.Module, input_norm=False, verbose=True, bar=False):
+def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, bar=False,
+                 dataset='kodak'):
     """ Test on Kodak dataset
 
     Args:
@@ -149,14 +150,21 @@ def kodak_val(model: torch.nn.Module, input_norm=False, verbose=True, bar=False)
         input_norm (bool, optional): normalize input or not. Defaults to None.
     """
     if verbose:
-        print(f'Evaluating {type(model)} on Kodak dataset...')
+        print(f'Evaluating {type(model)} on {dataset} dataset...')
     model.eval()
     device = next(model.parameters()).device
 
-    # kodak dataset
-    from mycv.paths import KODAK_DIR
-    img_names = os.listdir(KODAK_DIR)
-    img_paths = [str(KODAK_DIR / imname) for imname in img_names]
+    if dataset == 'kodak':
+        # kodak dataset
+        from mycv.paths import KODAK_DIR
+        img_dir = KODAK_DIR
+    elif dataset == 'clic':
+        from mycv.paths import CLIC_DIR
+        img_dir = CLIC_DIR / 'valid'
+    else:
+        img_dir = dataset
+    img_names = os.listdir(img_dir)
+    img_paths = [str(img_dir / imname) for imname in img_names]
     img_paths.sort()
 
     # traverse the dataset
