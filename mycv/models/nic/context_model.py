@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as f
 
 from mycv.models.nic.basic_module import conv2d, ResBlock
-from mycv.models.nic.gaussian_entropy_model import Distribution_for_entropy2
 
 
 class MaskConv3d(nn.Conv3d):
@@ -64,7 +63,7 @@ class Context(nn.Module):
 
 class Maskb_resblock(nn.Module):
     def __init__(self,in_channel,out_channel,kernel_size,stride,padding):
-        raise DeprecationWarning()
+        # raise DeprecationWarning()
         super(Maskb_resblock,self).__init__()
         self.in_ch = int(in_channel)
         self.out_ch = int(out_channel)
@@ -84,7 +83,7 @@ class Maskb_resblock(nn.Module):
 
 class Resblock_3D(nn.Module):
     def __init__(self,in_channel,out_channel,kernel_size,stride,padding):
-        raise DeprecationWarning()
+        # raise DeprecationWarning()
         super(Resblock_3D,self).__init__()
         self.in_ch = int(in_channel)
         self.out_ch = int(out_channel)
@@ -108,7 +107,7 @@ class Complex_context(nn.Module):
     context
     '''
     def __init__(self, ch=192, nums=[4,3]):
-        raise DeprecationWarning()
+        # raise DeprecationWarning()
         super(Complex_context, self).__init__()
         self.hyper_to_main = conv2d(ch*2, ch, 3, 1, 1)
         self.conv1 = MaskConv3d('A', 1, 24, 5, 1, 2)
@@ -120,7 +119,8 @@ class Complex_context(nn.Module):
             *[Resblock_3D(48, 48, 1, 1, 0) for _ in range(nums[1])],
             nn.Conv3d(48, 2, 1, 1, 0)
         )
-        self.gaussin_entropy_func = Distribution_for_entropy2()
+        from mycv.models.nic.gaussian_entropy_model import Distribution_for_entropy2_old
+        self.gaussin_entropy_func = Distribution_for_entropy2_old()
 
     def forward(self, x, hyper):
         x = torch.unsqueeze(x, dim=1)
@@ -157,6 +157,7 @@ class Weighted_Gaussian(nn.Module):
             nn.Conv3d(96, 9, 1, 1, 0)
         )
         self.conv3 = nn.Conv2d(M*2, M, 3, 1, 1)
+        from mycv.models.nic.gaussian_entropy_model import Distribution_for_entropy2
         self.gaussin_entropy_func = Distribution_for_entropy2()
 
     def forward(self, x, hyper):

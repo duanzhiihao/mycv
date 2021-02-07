@@ -22,17 +22,17 @@ class Low_bound(torch.autograd.Function):
         return grad1 * t
 
 
-class Distribution_for_entropy(nn.Module):
+class Distribution_for_entropy2_old(nn.Module):
     def __init__(self):
-        super(Distribution_for_entropy,self).__init__()
+        super(Distribution_for_entropy2_old,self).__init__()
 
     def forward(self, x, p_dec):
-        mean = p_dec[:,:192, :, :]
-        scale= p_dec[:,192:, :, :]
+        mean = p_dec[:,0,:, :, :]
+        scale= p_dec[:,1,:, :, :]
 
         # to make the scale always positive
         scale[scale == 0] = 1e-9
-        # scale1 = torch.clamp(scale1,min = 1e-6)
+        #scale1 = torch.clamp(scale1,min = 1e-6)
         m1 = torch.distributions.normal.Normal(mean,scale)
 
         lower = m1.cdf(x - 0.5)
