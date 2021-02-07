@@ -13,7 +13,7 @@ import wandb
 from mycv.utils.general import increment_dir
 from mycv.utils.torch_utils import set_random_seeds, warmup_cosine
 from mycv.utils.coding import MS_SSIM, cal_bpp
-from mycv.datasets.loadimgs import LoadImages, kodak_val
+from mycv.datasets.imcoding import LoadImages, nic_evaluate
 
 
 def train():
@@ -176,7 +176,7 @@ def train():
             # Evaluation
             if bi % 200 == 0:
                 _log_dic = {'general/epoch': epoch}
-                results = kodak_val(model, input_norm=cfg.input_norm, verbose=False)
+                results = nic_evaluate(model, input_norm=cfg.input_norm, verbose=False)
                 _log_dic.update({'metric/plain_val_'+k: v for k,v in results.items()})
                 # wandb log
                 wbrun.log(_log_dic, step=niter)

@@ -228,11 +228,10 @@ if __name__ == "__main__":
     from mycv.paths import WEIGHTS_DIR
     from mycv.utils.torch_utils import load_partial
     model = NLAIC(enable_bpp=True)
-    # model.load_state_dict(torch.load(WEIGHTS_DIR/'NLAIC_xq_ms.pkl'))
-    load_partial(model, WEIGHTS_DIR/'NLAIC_xq_ms.pkl')
+    load_partial(model, WEIGHTS_DIR/'nlaic_msssim64.pt')
     model.eval()
     model = model.cuda()
 
-    from mycv.datasets.loadimgs import kodak_val
-    results = kodak_val(model, input_norm=False, bar=True)
+    from mycv.datasets.imcoding import nic_evaluate
+    results = nic_evaluate(model, input_norm=False, bar=True)
     print(results)
