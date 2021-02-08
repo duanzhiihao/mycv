@@ -41,13 +41,13 @@ def train():
     parser.add_argument('--study',      type=bool, default=False)
     parser.add_argument('--device',     type=int,  default=[0], nargs='+')
     parser.add_argument('--workers',    type=int,  default=6)
-    parser.add_argument('--wbmode',     type=str,  default='disabled')
+    parser.add_argument('--wbmode',     type=str,  default='online')
     cfg = parser.parse_args()
     # model
     cfg.img_size = 224
     cfg.input_norm = False
     # optimizer
-    cfg.lr = 0.01
+    cfg.lr = 0.001
     cfg.momentum = 0.9
     cfg.weight_decay = 0.0001
     cfg.nesterov = False
@@ -200,7 +200,7 @@ def train():
             # forward
             with amp.autocast(enabled=cfg.amp):
                 p = model(imgs)
-                loss = loss_func(p, labels)
+                loss = loss_func(p, labels) * nB
                 # loss is averaged within image, sumed over batch, and sumed over gpus
             # backward, update
             scaler.scale(loss).backward()
@@ -219,9 +219,8 @@ def train():
 
             # logging
             cur_lr = optimizer.param_groups[0]['lr']
-            loss = loss.detach().cpu().item()
             acc = cal_acc(p.detach(), labels)
-            train_loss = (train_loss*i + loss) / (i+1)
+            train_loss = (train_loss*i + loss.item()/nB) / (i+1)
             train_acc = (train_acc*i + acc) / (i+1)
             mem = torch.cuda.max_memory_allocated(device) / 1e9
             s = ('%-10s' * 2 + '%-10.4g' * 5) % (
