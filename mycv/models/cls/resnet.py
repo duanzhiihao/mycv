@@ -39,7 +39,7 @@ class Bottleneck(nn.Module):
         self.bn2 = nn.BatchNorm2d(hidden)
         self.conv3 = conv1x1(hidden, hidden * self.expansion)
         self.bn3 = nn.BatchNorm2d(hidden * self.expansion)
-        self.relu = nn.ReLU(inplace=True)
+        self.act = nn.ReLU(inplace=True)
         self.downsample = downsample
         self.stride = stride
 
@@ -48,11 +48,11 @@ class Bottleneck(nn.Module):
 
         out = self.conv1(x)
         out = self.bn1(out)
-        out = self.relu(out)
+        out = self.act(out)
 
         out = self.conv2(out)
         out = self.bn2(out)
-        out = self.relu(out)
+        out = self.act(out)
 
         out = self.conv3(out)
         out = self.bn3(out)
@@ -61,7 +61,7 @@ class Bottleneck(nn.Module):
             identity = self.downsample(x)
 
         out += identity
-        out = self.relu(out)
+        out = self.act(out)
         return out
 
 
@@ -75,7 +75,7 @@ class ResNet(nn.Module):
         self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,
                                bias=False)
         self.bn1 = nn.BatchNorm2d(self.inplanes)
-        self.relu = nn.ReLU(inplace=True)
+        self.act = nn.ReLU(inplace=True)
         # self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
@@ -111,7 +111,7 @@ class ResNet(nn.Module):
         # x: [b, 3, H, W]
         x = self.conv1(x) # x: [b, 64, H/2, W/2]
         x = self.bn1(x)
-        x = self.relu(x)
+        x = self.act(x)
         # x = self.maxpool(x) # x: [b, 64, H/4, W/4]
         x = tnf.max_pool2d(x, kernel_size=3, stride=2, padding=1)
 
