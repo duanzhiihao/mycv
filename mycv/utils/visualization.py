@@ -1,3 +1,4 @@
+from numpy.lib.polynomial import polyval
 import torch
 import numpy as np
 import cv2
@@ -162,6 +163,26 @@ def imshow_tensor(tensor_batch):
     plt.show()
 
 
-def plt_show(im):
-    plt.imshow(im)
-    plt.show()
+def colorize_semseg(gray: torch.LongTensor, palette='cityscapes'):
+    """ Visualize sementic segmentation predictions
+
+    Args:
+        gray (torch.LongTensor): prediction int tensor
+        palette (str, optional): dataset name or color tensor. Defaults to 'cityscapes'.
+
+    Returns: a colored image
+    """
+    assert torch.is_tensor(gray) and gray.dim() == 2
+    assert gray.dtype in (torch.uint8, torch.int16, torch.int32, torch.int64)
+    if palette == 'cityscapes':
+        from mycv.datasets.cityscapes import COLORS
+        colors = COLORS
+    elif isinstance(palette, str):
+        raise ValueError('Unsupported palette name. Please provide the color list instead.')
+    else:
+        colors = palette
+    assert gray.min() >= 0 and gray.max() <= len(colors)
+    assert torch.is_tensor(colors) and colors.dim() == 2 and colors.shape[1] == 3
+
+    painting = colors[gray]
+    return painting

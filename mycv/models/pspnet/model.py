@@ -108,4 +108,3 @@ class PSPNet(nn.Module):
             return x.max(1)[1], main_loss, aux_loss
         else:
             return x
-
