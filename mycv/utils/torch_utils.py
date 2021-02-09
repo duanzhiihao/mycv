@@ -80,10 +80,15 @@ def rename_weights(weights, old, new, verbose=True):
         weights = weights['model']
     assert isinstance(weights, (dict, OrderedDict))
 
+    count = 0
     new_dic = OrderedDict()
     for k,v in weights.items():
+        if old in k:
+            count += 1
         k = k.replace(old, new)
         new_dic[k] = v
+    if verbose:
+        print(f"Total {len(weights)}, renamed {count} '{old}' to '{new}'")
     return new_dic
 
 
