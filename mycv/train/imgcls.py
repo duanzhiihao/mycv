@@ -120,13 +120,11 @@ def train():
     # optimizer
     optimizer = torch.optim.SGD(parameters, lr=cfg.lr,
                                 momentum=cfg.momentum, nesterov=cfg.nesterov)
-    # optimizer = torch.optim.Adam(parameters, lr=cfg.lr)
 
     # AMP
     scaler = amp.GradScaler(enabled=cfg.amp)
 
     log_parent = Path(f'runs/{cfg.project}')
-    wb_id = None
     results = defaultdict(float)
     if cfg.resume:
         # resume
@@ -139,7 +137,6 @@ def train():
         scaler.load_state_dict(checkpoint['scaler'])
         start_epoch = checkpoint['epoch'] + 1
         best_fitness = checkpoint.get(metric, 0)
-        wb_id = open(log_dir / 'wandb_id.txt', 'r').read()
     else:
         # new experiment
         run_name = increment_dir(dir_root=log_parent, name=cfg.model)
@@ -151,13 +148,12 @@ def train():
 
     # initialize wandb
     wbrun = wandb.init(project=cfg.project, group=cfg.group, name=run_name, config=cfg,
-                       dir='runs/', resume='allow', id=wb_id, mode=cfg.wbmode)
+                       dir='runs/', mode=cfg.wbmode)
     cfg = wbrun.config
     cfg.log_dir = log_dir
     cfg.wandb_id = wbrun.id
-    if not (log_dir / 'wandb_id.txt').exists():
-        with open(log_dir / 'wandb_id.txt', 'w') as f:
-            f.write(wbrun.id)
+    with open(log_dir / 'wandb_id.txt', 'a') as f:
+        print(wbrun.id, file=f)
 
     # lr scheduler
     _warmup = cfg.lr_warmup_epochs * len(trainloader)
