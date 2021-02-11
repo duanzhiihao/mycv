@@ -21,6 +21,9 @@ class Check(Dataset):
         if self.level == 0:
             assert Path(impath).exists(), impath
         elif self.level == 1:
+            img = Image.open(impath)
+            img.verify()
+        elif self.level == 2:
             img = Image.open(impath).convert('RGB')
             h, w = img.height, img.width
             im = tvf.to_tensor(img)
@@ -39,7 +42,7 @@ def check_images(img_paths, workers=4, check_level=0):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--workers', type=int, default=4)
-    parser.add_argument('--level',   type=int, default=0)
+    parser.add_argument('--level',   type=int, default=1)
     args = parser.parse_args()
 
     # imagenet root
