@@ -23,6 +23,9 @@ IMAGENET_DIR = Path('/ssd1/Datasets/imagenet')
 # Food-101 dataset
 FOOD101_DIR = Path('/ssd1/Datasets/food-101')
 
+# Cityscapes dataset: https://www.cityscapes-dataset.com/
+CITYSCAPES_DIR = Path('/ssd1/Datasets/Cityscapes')
+
 # COCO dataset: http://cocodataset.org/#home
 COCO_DIR = Path('/ssd1/Datasets/COCO')
 
