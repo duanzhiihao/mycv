@@ -1,3 +1,4 @@
+from tqdm import tqdm
 import collections
 import cv2
 import torch
@@ -48,7 +49,7 @@ CLASS_INFO = [
     _CityClass('bicycle',       33, 18,  'vehicle',      True,  False, (119, 11, 32)),
     # _CityClass('license plate', -1, -1,  'vehicle',      False, True,  (0, 0, 142)),
 ]
-COLORS = torch.Tensor(
+TRAIN_COLORS = torch.Tensor(
     [c.color for c in CLASS_INFO if (not c.ignore_in_eval)]
 ).to(dtype=torch.uint8)
 
@@ -64,7 +65,6 @@ class Cityscapes(torch.utils.data.Dataset):
         self.img_gt_paths = [tuple(pair.split()) for pair in data_list]
 
         # data augmentation setting
-        self.img_hw = img_hw
         if 'train' in split:
             _mean = [v*255 for v in RGB_MEAN]
             self.transform = transform.Compose([
@@ -80,10 +80,11 @@ class Cityscapes(torch.utils.data.Dataset):
             self.transform = None
 
         # build mapping from cityscapes id to training id
-        mapping = torch.zeros(len(CLASS_INFO), dtype=torch.uint8)
+        mapping = torch.zeros(len(CLASS_INFO), dtype=torch.int64)
         for cinfo in CLASS_INFO:
             mapping[cinfo.id] = cinfo.train_id
         self.mapping = mapping
+        self.num_cls = 19
 
     def __len__(self):
         return len(self.img_gt_paths)
@@ -101,30 +102,94 @@ class Cityscapes(torch.utils.data.Dataset):
         # data augmentation during training
         if self.transform is not None:
             im, label = self.transform(im, label)
-        # numpy to tensor
+        # image: np to tensor, normalization
         im = torch.from_numpy(im).permute(2, 0, 1).float() / 255.0
+        im = (im - self.input_mean) / self.input_std
+        # label: np to tensor, map the label id to training id
         label = torch.from_numpy(label).to(dtype=torch.int64)
-        # map the label id to training id
         label = self.mapping[label]
 
         return im, label
 
 
-if __name__ == '__main__':
+def evaluate_semseg(model, testloader=None, ignore_index=255):
+    model.eval()
+    device = next(model.parameters()).device
+    forward_ = getattr(model, 'forward_cls', model.forward)
+
+    if testloader is None:
+        testloader = torch.utils.data.DataLoader(
+            Cityscapes(split='val'), batch_size=1, shuffle=False, num_workers=1,
+            pin_memory=True, drop_last=False
+        )
+    num_cls = testloader.dataset.num_cls
+
+    sum_inter, sum_union, sum_tgt = 0, 0, 0
+    for imgs, labels in tqdm(testloader):
+        # _debug(labels[0])
+        imgs, labels = imgs.to(device=device), labels.to(device=device)
+        new = torch.zeros(1, 3, 1025, 2049).to(device=device)
+        new[:, :, :1024, :2048] = imgs
+        with torch.no_grad():
+            output = forward_(new)
+        assert output.dim() == 4
+
+        output, label = output.squeeze(0), labels.squeeze(0)
+        output = output[:, :1024, :2048]
+        output = torch.argmax(output, dim=0)
+        output[label == ignore_index] = ignore_index
+        tpmask = (output == label) # true positive (ie. intersection) for all classes
+        intersection = output[tpmask]
+        inter = torch.histc(intersection, bins=num_cls, min=0, max=num_cls-1)
+        area_p = torch.histc(output, bins=num_cls, min=0, max=num_cls-1)
+        area_t = torch.histc(label,  bins=num_cls, min=0, max=num_cls-1)
+        union = area_p + area_t - inter
+        # ious = area_inter / (area_output + area_target - area_inter)
+        sum_inter += inter
+        sum_union += union
+        sum_tgt += area_t
+    ious = sum_inter / sum_union
+    miou = ious.mean()
+    acc = (sum_inter / sum_tgt).mean()
+
+    results = {'miou': miou.item(), 'acc': acc.item()}
+    return results
+
+
+def _debug(label):
     import matplotlib.pyplot as plt
     from mycv.utils.visualization import colorize_semseg
-    dataset = Cityscapes()
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=4, num_workers=0)
+    # label = label.to(dtype=torch.int64)
+    # painting = TRAIN_COLORS[label].numpy()
+    painting = colorize_semseg(label)
+    plt.imshow(painting); plt.show()
 
-    for imgs, labels in dataloader:
-        for im_, seg_ in zip(imgs, labels):
-            seg_ = colorize_semseg(seg_)
-            # fgmask = (seg_ <= 18)
-            # segcolor = torch.zeros()
-            plt.figure(); plt.imshow(im_.permute(1,2,0).numpy())
-            plt.figure(); plt.imshow(seg_.numpy()); plt.show()
-            debug = 1
-    debug = 1
+
+if __name__ == '__main__':
+    # import matplotlib.pyplot as plt
+    # from mycv.utils.visualization import colorize_semseg
+    # dataset = Cityscapes()
+    # dataloader = torch.utils.data.DataLoader(dataset, batch_size=4, num_workers=0)
+    # for imgs, labels in dataloader:
+    #     for im_, seg_ in zip(imgs, labels):
+    #         seg_ = colorize_semseg(seg_)
+    #         # plt.figure(); plt.imshow(im_.permute(1,2,0).numpy())
+    #         # plt.figure(); plt.imshow(seg_.numpy()); plt.show()
+    #         overlay = 0.7 * im_.permute(1,2,0).numpy() + 0.3 * seg_.float().numpy() / 255
+    #         plt.imshow(overlay); plt.show()
+    #         debug = 1
+    # debug = 1
+
+    from mycv.paths import MYCV_DIR
+    from mycv.external.semseg import PSPNet
+    model = PSPNet()
+    model = model.cuda()
+    model.eval()
+    weights = torch.load(MYCV_DIR / 'weights/psp50_epoch_200.pt')
+    model.load_state_dict(weights)
+
+    results = evaluate_semseg(model)
+    print(results)
 
 
 # CLASS_NAMES = [

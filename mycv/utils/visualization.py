@@ -175,8 +175,8 @@ def colorize_semseg(gray: torch.LongTensor, palette='cityscapes'):
     assert torch.is_tensor(gray) and gray.dim() == 2
     assert gray.dtype in (torch.uint8, torch.int16, torch.int32, torch.int64)
     if palette == 'cityscapes':
-        from mycv.datasets.cityscapes import COLORS
-        colors = COLORS
+        from mycv.datasets.cityscapes import TRAIN_COLORS
+        colors = TRAIN_COLORS
     elif isinstance(palette, str):
         raise ValueError('Unsupported palette name. Please provide the color list instead.')
     else:
