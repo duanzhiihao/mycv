@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 
 
-def set_random_seeds(random_seed=0):
+def set_random_seeds(random_seed=1):
     torch.manual_seed(random_seed)
     np.random.seed(random_seed)
     random.seed(random_seed)
