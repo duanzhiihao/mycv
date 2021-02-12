@@ -29,11 +29,11 @@ class PSPNet(nn.Module):
     """ PSPNet: https://arxiv.org/abs/1612.01105
     Copied from https://github.com/hszhao/semseg
     """
-    def __init__(self, layers=50, bins=(1, 2, 3, 6), dropout=0.1, classes=19):
+    def __init__(self, layers=50, bins=(1, 2, 3, 6), dropout=0.1, num_class=19):
         super(PSPNet, self).__init__()
         assert layers in [50, 101, 152]
         assert 2048 % len(bins) == 0
-        assert classes > 1
+        assert num_class > 1
         self.criterion = nn.CrossEntropyLoss(ignore_index=255)
 
         if layers == 50:
@@ -70,14 +70,14 @@ class PSPNet(nn.Module):
             nn.BatchNorm2d(512),
             nn.ReLU(inplace=True),
             nn.Dropout2d(p=dropout),
-            nn.Conv2d(512, classes, kernel_size=1)
+            nn.Conv2d(512, num_class, kernel_size=1)
         )
         self.aux = nn.Sequential(
             nn.Conv2d(1024, 256, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
             nn.Dropout2d(p=dropout),
-            nn.Conv2d(256, classes, kernel_size=1)
+            nn.Conv2d(256, num_class, kernel_size=1)
         )
 
     def forward(self, x, y=None):
@@ -98,7 +98,7 @@ class PSPNet(nn.Module):
             aux = F.interpolate(aux, size=(h, w), mode='bilinear', align_corners=True)
             main_loss = self.criterion(x, y)
             aux_loss = self.criterion(aux, y)
-            return x.max(1)[1], main_loss, aux_loss
+            return torch.max(x.detach(), dim=1)[1], main_loss, aux_loss
         else:
             return x
 
@@ -107,5 +107,14 @@ if __name__ == '__main__':
     model = PSPNet()
     model = model.cuda()
 
-    x = torch.rand(4, 3, 713, 713).cuda()
-    p = model(x)
+    # x = torch.rand(4, 3, 713, 713).cuda()
+    # p = model(x)
+
+    from mycv.paths import MYCV_DIR
+    from mycv.datasets.cityscapes import evaluate_semseg
+    weights = torch.load(MYCV_DIR / 'weights/psp50_epoch_200.pt')
+    model.load_state_dict(weights)
+    model.eval()
+
+    results = evaluate_semseg(model)
+    print(results)

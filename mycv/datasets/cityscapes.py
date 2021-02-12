@@ -57,7 +57,7 @@ TRAIN_COLORS = torch.Tensor(
 class Cityscapes(torch.utils.data.Dataset):
     input_mean = torch.FloatTensor(RGB_MEAN).view(3, 1, 1)
     input_std  = torch.FloatTensor(RGB_STD).view(3, 1, 1)
-    num_cls = 19
+    num_class = 19
     ignore_label = 255
 
     def __init__(self, split='train_fine', train_size=713):
@@ -113,7 +113,7 @@ class Cityscapes(torch.utils.data.Dataset):
         return im, label
 
 
-def evaluate_semseg(model, testloader=None, ignore_label=255):
+def evaluate_semseg(model, testloader=None):
     model.eval()
     device = next(model.parameters()).device
     forward_ = getattr(model, 'forward_cls', model.forward)
@@ -123,7 +123,8 @@ def evaluate_semseg(model, testloader=None, ignore_label=255):
             Cityscapes(split='val'), batch_size=1, shuffle=False, num_workers=1,
             pin_memory=True, drop_last=False
         )
-    num_cls = testloader.dataset.num_cls
+    num_cls = testloader.dataset.num_class
+    ignore_label = testloader.dataset.ignore_label
 
     sum_inter, sum_union, sum_tgt = 0, 0, 0
     for imgs, labels in tqdm(testloader):
