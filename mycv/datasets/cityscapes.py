@@ -57,6 +57,8 @@ TRAIN_COLORS = torch.Tensor(
 class Cityscapes(torch.utils.data.Dataset):
     input_mean = torch.FloatTensor(RGB_MEAN).view(3, 1, 1)
     input_std  = torch.FloatTensor(RGB_STD).view(3, 1, 1)
+    num_cls = 19
+    ignore_label = 255
 
     def __init__(self, split='train_fine', train_size=713):
         assert split in {'train_fine', 'val', 'test'}
@@ -83,7 +85,6 @@ class Cityscapes(torch.utils.data.Dataset):
         for cinfo in CLASS_INFO:
             mapping[cinfo.id] = cinfo.train_id
         self.mapping = mapping
-        self.num_cls = 19
 
     def __len__(self):
         return len(self.img_gt_paths)
@@ -112,7 +113,7 @@ class Cityscapes(torch.utils.data.Dataset):
         return im, label
 
 
-def evaluate_semseg(model, testloader=None, ignore_index=255):
+def evaluate_semseg(model, testloader=None, ignore_label=255):
     model.eval()
     device = next(model.parameters()).device
     forward_ = getattr(model, 'forward_cls', model.forward)
@@ -138,7 +139,7 @@ def evaluate_semseg(model, testloader=None, ignore_index=255):
         output, label = output.squeeze(0), labels.squeeze(0)
         output = output[:, :1024, :2048]
         output = torch.argmax(output, dim=0)
-        output[label == ignore_index] = ignore_index
+        output[label == ignore_label] = ignore_label
         tpmask = (output == label) # true positive (ie. intersection) for all classes
         intersection = output[tpmask]
         inter = torch.histc(intersection, bins=num_cls, min=0, max=num_cls-1)
