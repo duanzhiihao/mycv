@@ -12,7 +12,8 @@ from mycv.paths import IMAGENET_DIR
 
 def get_classes():
     fpath = IMAGENET_DIR / 'annotations/classes.txt'
-    wnids = open(fpath, 'r').read().strip().split('\n')
+    with open(fpath, 'r') as f:
+        wnids = f.read().strip().split('\n')
     assert len(wnids) == 1000
     wnid_to_idx = {s:i for i,s in enumerate(wnids)}
     return wnids, wnid_to_idx
@@ -37,7 +38,8 @@ class ImageNetCls(torch.utils.data.Dataset):
         else:
             img_dir = IMAGENET_DIR / 'train'
         assert ann_path.is_file(), f'Error: {ann_path} does not exist.'
-        lines = open(ann_path, 'r').read().strip().split('\n')
+        with open(ann_path, 'r') as f:
+            lines = f.read().strip().split('\n')
 
         self._img_paths = []
         self._labels = []
