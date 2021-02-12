@@ -170,15 +170,15 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
     from mycv.utils.visualization import colorize_semseg
     dataset = Cityscapes()
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=4, num_workers=0)
-    for imgs, labels in dataloader:
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=4, num_workers=4)
+    for imgs, labels in tqdm(dataloader, total=len(dataloader)):
         for im_, seg_ in zip(imgs, labels):
-            im_ = im_ * dataset.input_std + dataset.input_mean
-            seg_ = colorize_semseg(seg_)
+            # im_ = im_ * dataset.input_std + dataset.input_mean
+            # seg_ = colorize_semseg(seg_)
             # plt.figure(); plt.imshow(im_.permute(1,2,0).numpy())
             # plt.figure(); plt.imshow(seg_.numpy()); plt.show()
-            overlay = 0.7 * im_.permute(1,2,0).numpy() + 0.3 * seg_.float().numpy() / 255.0
-            plt.imshow(overlay); plt.show()
+            # overlay = 0.7 * im_.permute(1,2,0).numpy() + 0.3 * seg_.float().numpy() / 255.0
+            # plt.imshow(overlay); plt.show()
             debug = 1
     debug = 1
 

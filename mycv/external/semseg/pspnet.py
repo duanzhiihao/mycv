@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-from ._resnet import resnet50
+from mycv.external.semseg._resnet import resnet50
 
 class PPM(nn.Module):
     def __init__(self, in_dim, reduction_dim, bins):
@@ -101,3 +101,11 @@ class PSPNet(nn.Module):
             return x.max(1)[1], main_loss, aux_loss
         else:
             return x
+
+
+if __name__ == '__main__':
+    model = PSPNet()
+    model = model.cuda()
+
+    x = torch.rand(4, 3, 713, 713).cuda()
+    p = model(x)
