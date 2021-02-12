@@ -181,8 +181,11 @@ def colorize_semseg(gray: torch.LongTensor, palette='cityscapes'):
         raise ValueError('Unsupported palette name. Please provide the color list instead.')
     else:
         colors = palette
-    assert gray.min() >= 0 and gray.max() <= len(colors)
+    # assert gray.min() >= 0 and gray.max() <= len(colors)
     assert torch.is_tensor(colors) and colors.dim() == 2 and colors.shape[1] == 3
 
-    painting = colors[gray]
+    painting = torch.zeros(gray.shape[0], gray.shape[1], 3, dtype=torch.uint8)
+    fgmask = (gray >= 0) & (gray < len(colors))
+    painting[fgmask] = colors[gray[fgmask].to(dtype=torch.int64)]
+    # painting = colors[gray]
     return painting
