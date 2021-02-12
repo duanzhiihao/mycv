@@ -7,10 +7,10 @@ from mycv.paths import CITYSCAPES_DIR
 
 
 if __name__ == '__main__':
-    img_root = 'leftImg8bit/train'
-    gt_root = 'gtFine/train'
+    img_root = 'leftImg8bit/val'
+    gt_root = 'gtFine/val'
+    list_path = CITYSCAPES_DIR / 'annotations/val.txt'
 
-    list_path = CITYSCAPES_DIR / 'annotations/train_fine.txt'
     if list_path.exists():
         print(f'Warning: {list_path} exists. Removing the old file...')
     file = open(list_path, 'w')
