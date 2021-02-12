@@ -58,7 +58,7 @@ class Cityscapes(torch.utils.data.Dataset):
     input_mean = torch.FloatTensor(RGB_MEAN).view(3, 1, 1)
     input_std  = torch.FloatTensor(RGB_STD).view(3, 1, 1)
 
-    def __init__(self, split='val', train_size=713):
+    def __init__(self, split='train_fine', train_size=713):
         assert split in {'train_fine', 'val', 'test'}
         # raed datalist
         list_path = CITYSCAPES_DIR / f'annotations/{split}.txt'
@@ -70,12 +70,10 @@ class Cityscapes(torch.utils.data.Dataset):
             _mean = [v*255 for v in RGB_MEAN]
             self.transform = transform.Compose([
                 transform.RandScale([0.5, 2.0]),
-                transform.RandRotate([-10, 10], padding=_mean, ignore_label=255),
+                transform.RandRotate([-10, 10], padding=_mean, ignore_label=0),
                 transform.RandomGaussianBlur(),
                 transform.RandomHorizontalFlip(),
-                transform.Crop(train_size, crop_type='rand', padding=_mean, ignore_label=255),
-                # ToTensor(),
-                # Normalize(mean=(0.485,0.456,0.406), std=(0.229,0.224,0.225))
+                transform.Crop(train_size, crop_type='rand', padding=_mean, ignore_label=0),
             ])
         else:
             self.transform = None
@@ -107,6 +105,7 @@ class Cityscapes(torch.utils.data.Dataset):
         im = torch.from_numpy(im).permute(2, 0, 1).float() / 255.0
         im = (im - self.input_mean) / self.input_std
         # label: np to tensor, map the label id to training id
+        # label[label == 255] = 0
         label = torch.from_numpy(label).to(dtype=torch.int64)
         label = self.mapping[label]
 
@@ -168,30 +167,31 @@ def _debug(label):
 
 
 if __name__ == '__main__':
-    # import matplotlib.pyplot as plt
-    # from mycv.utils.visualization import colorize_semseg
-    # dataset = Cityscapes()
-    # dataloader = torch.utils.data.DataLoader(dataset, batch_size=4, num_workers=0)
-    # for imgs, labels in dataloader:
-    #     for im_, seg_ in zip(imgs, labels):
-    #         seg_ = colorize_semseg(seg_)
-    #         # plt.figure(); plt.imshow(im_.permute(1,2,0).numpy())
-    #         # plt.figure(); plt.imshow(seg_.numpy()); plt.show()
-    #         overlay = 0.7 * im_.permute(1,2,0).numpy() + 0.3 * seg_.float().numpy() / 255
-    #         plt.imshow(overlay); plt.show()
-    #         debug = 1
-    # debug = 1
+    import matplotlib.pyplot as plt
+    from mycv.utils.visualization import colorize_semseg
+    dataset = Cityscapes()
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=4, num_workers=0)
+    for imgs, labels in dataloader:
+        for im_, seg_ in zip(imgs, labels):
+            im_ = im_ * dataset.input_std + dataset.input_mean
+            seg_ = colorize_semseg(seg_)
+            # plt.figure(); plt.imshow(im_.permute(1,2,0).numpy())
+            # plt.figure(); plt.imshow(seg_.numpy()); plt.show()
+            overlay = 0.7 * im_.permute(1,2,0).numpy() + 0.3 * seg_.float().numpy() / 255.0
+            plt.imshow(overlay); plt.show()
+            debug = 1
+    debug = 1
 
-    from mycv.paths import MYCV_DIR
-    from mycv.external.semseg import PSPNet
-    model = PSPNet()
-    model = model.cuda()
-    model.eval()
-    weights = torch.load(MYCV_DIR / 'weights/psp50_epoch_200.pt')
-    model.load_state_dict(weights)
+    # from mycv.paths import MYCV_DIR
+    # from mycv.external.semseg import PSPNet
+    # model = PSPNet()
+    # model = model.cuda()
+    # model.eval()
+    # weights = torch.load(MYCV_DIR / 'weights/psp50_epoch_200.pt')
+    # model.load_state_dict(weights)
 
-    results = evaluate_semseg(model)
-    print(results)
+    # results = evaluate_semseg(model)
+    # print(results)
 
 
 # CLASS_NAMES = [
