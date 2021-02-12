@@ -57,7 +57,8 @@ TRAIN_COLORS = torch.Tensor(
 class Cityscapes(torch.utils.data.Dataset):
     input_mean = torch.FloatTensor(RGB_MEAN).view(3, 1, 1)
     input_std  = torch.FloatTensor(RGB_STD).view(3, 1, 1)
-    def __init__(self, split='val', img_hw=(713,713)):
+
+    def __init__(self, split='val', train_size=713):
         assert split in {'train_fine', 'val', 'test'}
         # raed datalist
         list_path = CITYSCAPES_DIR / f'annotations/{split}.txt'
@@ -72,7 +73,7 @@ class Cityscapes(torch.utils.data.Dataset):
                 transform.RandRotate([-10, 10], padding=_mean, ignore_label=255),
                 transform.RandomGaussianBlur(),
                 transform.RandomHorizontalFlip(),
-                transform.Crop(img_hw, crop_type='rand', padding=_mean, ignore_label=255),
+                transform.Crop(train_size, crop_type='rand', padding=_mean, ignore_label=255),
                 # ToTensor(),
                 # Normalize(mean=(0.485,0.456,0.406), std=(0.229,0.224,0.225))
             ])
@@ -127,8 +128,9 @@ def evaluate_semseg(model, testloader=None, ignore_index=255):
     sum_inter, sum_union, sum_tgt = 0, 0, 0
     for imgs, labels in tqdm(testloader):
         # _debug(labels[0])
+        assert imgs.shape[2:] == labels.shape[1:] == (1024, 2048)
         imgs, labels = imgs.to(device=device), labels.to(device=device)
-        new = torch.zeros(1, 3, 1025, 2049).to(device=device)
+        new = torch.zeros(1, 3, 1025, 2049, device=device)
         new[:, :, :1024, :2048] = imgs
         with torch.no_grad():
             output = forward_(new)
