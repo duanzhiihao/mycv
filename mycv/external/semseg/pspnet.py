@@ -26,7 +26,11 @@ class PPM(nn.Module):
 
 
 class PSPNet(nn.Module):
-    def __init__(self, layers=50, bins=(1, 2, 3, 6), dropout=0.1, classes=2, zoom_factor=8, use_ppm=True, criterion=nn.CrossEntropyLoss(ignore_index=255)):
+    """ PSPNet: https://arxiv.org/abs/1612.01105
+    Copied from https://github.com/hszhao/semseg
+    """
+    def __init__(self, layers=50, bins=(1, 2, 3, 6), dropout=0.1, classes=19, zoom_factor=8,
+                 use_ppm=True, criterion=nn.CrossEntropyLoss(ignore_index=255)):
         super(PSPNet, self).__init__()
         assert layers in [50, 101, 152]
         assert 2048 % len(bins) == 0
