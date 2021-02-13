@@ -89,7 +89,7 @@ def train():
     cfg.input_norm = True
     cfg.aux_weight = 0.4
     # optimizer
-    cfg.lr = 0.001
+    cfg.lr = 0.01
     cfg.momentum = 0.9
     cfg.weight_decay = 0.0001
     # lr scheduler
@@ -161,6 +161,7 @@ def train():
         print(str(model), file=open(log_dir / 'model.txt', 'w'))
         start_epoch = 0
         best_fitness = 0
+    start_iter = start_epoch * len(trainloader)
 
     # initialize wandb
     wbrun = wandb.init(project=cfg.project, group=cfg.group, name=run_name, config=cfg,
@@ -175,12 +176,12 @@ def train():
     _warmup = cfg.lr_warmup_epochs * len(trainloader)
     _total = epochs * len(trainloader)
     lr_func = lambda x: warmup_cosine(x, cfg.lrf, _warmup, _total)
-    scheduler = LambdaLR(optimizer, lr_lambda=lr_func, last_epoch=start_epoch - 1)
+    scheduler = LambdaLR(optimizer, lr_lambda=lr_func, last_epoch=start_iter - 1)
 
     # Exponential moving average
     if cfg.ema:
         ema = ModelEMA(model, decay=0.9999)
-        ema.updates = start_epoch * len(trainloader)  # set EMA updates
+        ema.updates = start_iter  # set EMA updates
         ema.warmup = cfg.ema_warmup_epochs * len(trainloader) # set EMA warmup
     else:
         ema = None
