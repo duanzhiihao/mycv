@@ -92,7 +92,7 @@ def train():
     cfg.input_norm = True
     cfg.aux_weight = 0.4
     # optimizer
-    cfg.lr = 0.01
+    cfg.lr = 0.001
     cfg.momentum = 0.9
     cfg.weight_decay = 0.0001
     # lr scheduler
@@ -123,12 +123,12 @@ def train():
     else:
         raise ValueError()
     # training set
-    trainset = Cityscapes(train_split, train_size=cfg.img_size)
+    trainset = Cityscapes(train_split, train_size=cfg.img_size, input_norm=cfg.input_norm)
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=cfg.batch_size,
                     shuffle=True, num_workers=cfg.workers, pin_memory=True)
     # test set
     testloader = torch.utils.data.DataLoader(
-        Cityscapes('val'),
+        Cityscapes('val', input_norm=cfg.input_norm),
         batch_size=1, shuffle=False, num_workers=1, pin_memory=True, drop_last=False
     )
 
@@ -240,7 +240,7 @@ def train():
             torch.cuda.reset_peak_memory_stats()
             # Weights & Biases logging
             if niter % 100 == 0:
-                save_tensor_images(imgs[:4], save_path=log_dir / 'imgs.png')
+                save_tensor_images(imgs[:4], log_dir / 'imgs.png', cfg.input_norm)
                 wbrun.log({
                     'general/lr': cur_lr,
                     'train/epoch_loss': epoch_loss,

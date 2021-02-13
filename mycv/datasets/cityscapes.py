@@ -60,7 +60,7 @@ class Cityscapes(torch.utils.data.Dataset):
     num_class = 19
     ignore_label = 255
 
-    def __init__(self, split='train_fine', train_size=713):
+    def __init__(self, split='train_fine', train_size=713, input_norm=True):
         assert split in {'train_fine', 'val', 'test'}
         # raed datalist
         list_path = CITYSCAPES_DIR / f'annotations/{split}.txt'
@@ -79,6 +79,7 @@ class Cityscapes(torch.utils.data.Dataset):
             ])
         else:
             self.transform = None
+        self.input_norm = input_norm
 
         # build mapping from cityscapes id to training id
         mapping = torch.zeros(len(CLASS_INFO), dtype=torch.int64)
@@ -104,7 +105,8 @@ class Cityscapes(torch.utils.data.Dataset):
             im, label = self.transform(im, label)
         # image: np to tensor, normalization
         im = torch.from_numpy(im).permute(2, 0, 1).float() / 255.0
-        im = (im - self.input_mean) / self.input_std
+        if self.input_norm:
+            im = (im - self.input_mean) / self.input_std
         # label: np to tensor, map the label id to training id
         # label[label == 255] = 0
         label = torch.from_numpy(label).to(dtype=torch.int64)
@@ -113,15 +115,16 @@ class Cityscapes(torch.utils.data.Dataset):
         return im, label
 
 
-def evaluate_semseg(model, testloader=None):
+def evaluate_semseg(model, testloader=None, input_norm=None):
     model.eval()
     device = next(model.parameters()).device
     forward_ = getattr(model, 'forward_cls', model.forward)
 
     if testloader is None:
+        assert input_norm is not None
         testloader = torch.utils.data.DataLoader(
-            Cityscapes(split='val'), batch_size=1, shuffle=False, num_workers=1,
-            pin_memory=True, drop_last=False
+            Cityscapes(split='val', input_norm=input_norm),
+            batch_size=1, shuffle=False, num_workers=1, pin_memory=True, drop_last=False
         )
     num_cls = testloader.dataset.num_class
     ignore_label = testloader.dataset.ignore_label
