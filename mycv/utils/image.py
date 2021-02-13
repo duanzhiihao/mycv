@@ -29,7 +29,7 @@ def is_image(im, cv2_ok=True, pil_ok=True):
     return flag
 
 
-def save_tensor_images(images, save_path: str, is_normalized=False):        
+def save_tensor_images(images, save_path: str, is_normalized=False):
     assert isinstance(images, (list, torch.Tensor))
     imglist = []
     for img in images:
