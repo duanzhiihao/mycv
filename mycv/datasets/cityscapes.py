@@ -53,11 +53,18 @@ TRAIN_COLORS = torch.Tensor(
     [c.color for c in CLASS_INFO if (not c.ignore_in_eval)]
 ).to(dtype=torch.uint8)
 
+def label_to_train_id_mapping():
+    # build mapping from cityscapes id to training id
+    mapping = torch.zeros(len(CLASS_INFO), dtype=torch.int64)
+    for cinfo in CLASS_INFO:
+        mapping[cinfo.id] = cinfo.train_id
+    return mapping
 
 class Cityscapes(torch.utils.data.Dataset):
     input_mean = torch.FloatTensor(RGB_MEAN).view(3, 1, 1)
     input_std  = torch.FloatTensor(RGB_STD).view(3, 1, 1)
     num_class = 19
+    mapping = label_to_train_id_mapping()
     ignore_label = 255
 
     def __init__(self, split='train_fine', train_size=713, input_norm=True):
@@ -80,12 +87,6 @@ class Cityscapes(torch.utils.data.Dataset):
         else:
             self.transform = None
         self.input_norm = input_norm
-
-        # build mapping from cityscapes id to training id
-        mapping = torch.zeros(len(CLASS_INFO), dtype=torch.int64)
-        for cinfo in CLASS_INFO:
-            mapping[cinfo.id] = cinfo.train_id
-        self.mapping = mapping
 
     def __len__(self):
         return len(self.img_gt_paths)

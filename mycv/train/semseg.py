@@ -1,5 +1,4 @@
 from mycv.utils.general import disable_multithreads
-from torch.nn import modules
 disable_multithreads()
 import os
 from pathlib import Path
@@ -7,16 +6,14 @@ import argparse
 from tqdm import tqdm
 from collections import defaultdict
 import wandb
-import numpy as np
-import matplotlib.pyplot as plt
+import cv2
 import torch
 import torch.cuda.amp as amp
 from torch.optim.lr_scheduler import LambdaLR
 
+from mycv.datasets.cityscapes import Cityscapes, evaluate_semseg, TRAIN_COLORS
 from mycv.utils.general import increment_dir
 from mycv.utils.torch_utils import set_random_seeds, ModelEMA, warmup_cosine, is_parallel
-from mycv.utils.image import save_tensor_images
-from mycv.datasets.cityscapes import Cityscapes, evaluate_semseg
 
 
 def compute_metric(outputs: torch.Tensor, labels: torch.LongTensor, ignore_label=255):
@@ -84,7 +81,7 @@ def train():
     parser.add_argument('--ema',        type=bool, default=True)
     parser.add_argument('--epochs',     type=int,  default=200)
     parser.add_argument('--device',     type=int,  default=[0], nargs='+')
-    parser.add_argument('--workers',    type=int,  default=4)
+    parser.add_argument('--workers',    type=int,  default=2)
     parser.add_argument('--wbmode',     type=str,  default='disabled')
     cfg = parser.parse_args()
     # model
@@ -146,7 +143,6 @@ def train():
     log_parent = Path(f'runs/{cfg.project}')
     results = defaultdict(float)
     if cfg.resume:
-        raise NotImplementedError()
         # resume
         run_name = cfg.resume
         log_dir = log_parent / run_name
@@ -240,7 +236,8 @@ def train():
             torch.cuda.reset_peak_memory_stats()
             # Weights & Biases logging
             if niter % 100 == 0:
-                save_tensor_images(imgs[:4], log_dir / 'imgs.png', cfg.input_norm)
+                save_prediction(imgs[0], labels[0], outputs[0],
+                                log_dir / 'prediction.png', cfg.input_norm)
                 wbrun.log({
                     'general/lr': cur_lr,
                     'train/epoch_loss': epoch_loss,
@@ -291,23 +288,41 @@ def train():
     # ----Training end
 
 
-def save_prediction(data, fpath, title=''):
-    raise NotImplementedError()
-    names = [t[0] for t in data]
-    data = [t[1] for t in data]
-    plt.clf()
-    plt.figure()
-    x = list(range(len(data)))
-    plt.bar(x, data)
-    plt.title(title)
-    plt.xlabel('Layer'); plt.ylabel('Gradient mean abs')
-    plt.savefig(fpath)
+def save_prediction(img: torch.Tensor, label: torch.Tensor, output: torch.Tensor,
+                    save_path: str, is_normalized=False):
+    assert img.dtype == torch.float and img.dim() == 3
+    nB, nH, nW = img.shape
+    assert label.shape == output.shape == (nH, nW)
+    assert label.dtype == output.dtype == torch.int64
 
-    assert ' ' not in title
-    txt_path = fpath.parent / f'{title}.txt'
-    with open(txt_path, 'w') as f:
-        for str_ in names:
-            print(str_, file=f)
+    img, label, output = img.cpu(), label.cpu(), output.detach().cpu()
+    if is_normalized:
+        img = (img * Cityscapes.input_std) + Cityscapes.input_mean
+
+    # input image
+    im = torch.clamp(img, min=0, max=1) * 255
+    im = im.to(dtype=torch.uint8).permute(1, 2, 0)
+    # pred-gt difference
+    igmask = (label == Cityscapes.ignore_label)
+    tpmask = (output == label)
+    diff = torch.ones(3, nH, nW, dtype=torch.uint8) + 50
+    diff[1, tpmask] = 255
+    diff[0, ~tpmask] = 255
+    diff[:, igmask] = 0
+    diff = diff.permute(1, 2, 0)
+    # ground truth
+    label[igmask] = 0
+    gt = TRAIN_COLORS[label]
+    gt[igmask, :] = 0
+    # prediction
+    pred = TRAIN_COLORS[output]
+
+    row1 = torch.cat([im, gt], dim=1)
+    row2 = torch.cat([diff, pred], dim=1)
+    im = torch.cat([row1, row2], dim=0)
+
+    im = cv2.cvtColor(im.numpy(), cv2.COLOR_RGB2BGR)
+    cv2.imwrite(str(save_path), im)
 
 
 if __name__ == '__main__':
