@@ -3,6 +3,9 @@ import cv2
 from PIL import Image
 import torch
 
+_input_mean = torch.FloatTensor((0.485, 0.456, 0.406)).view(3, 1, 1)
+_input_std  = torch.FloatTensor((0.229, 0.224, 0.225)).view(3, 1, 1)
+
 
 def is_image(im, cv2_ok=True, pil_ok=True):
     """ Check if the input is a valid image or not
@@ -26,11 +29,13 @@ def is_image(im, cv2_ok=True, pil_ok=True):
     return flag
 
 
-def save_tensor_images(images, save_path: str):
+def save_tensor_images(images, save_path: str, is_normalized=False):        
     assert isinstance(images, (list, torch.Tensor))
     imglist = []
     for img in images:
         assert img.dtype == torch.float and img.dim() == 3
+        if is_normalized:
+            img = (img * _input_std) + _input_mean
         im = torch.clamp(img.detach().cpu(), min=0, max=1)
         imglist.append(im)
     if len(imglist) == 1:
@@ -43,7 +48,7 @@ def save_tensor_images(images, save_path: str):
         im = torch.cat([row1, row2], dim=1)
     else:
         raise NotImplementedError(f'Get {len(imglist)} images to save, not supported.')
-    im = im.permute(1,2,0) * 255
+    im = im.permute(1, 2, 0) * 255
     im = im.to(dtype=torch.uint8).numpy()
     im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
     cv2.imwrite(str(save_path), im)
