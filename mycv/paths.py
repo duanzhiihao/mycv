@@ -9,7 +9,7 @@ from pathlib import Path
 MYCV_DIR = Path(os.path.dirname(__file__))
 
 # Network weights dir
-WEIGHTS_DIR = Path(os.path.dirname(__file__)) / 'weights'
+# WEIGHTS_DIR = Path(os.path.dirname(__file__)) / 'weights'
 
 # CLIC dataset: http://www.compression.cc/
 CLIC_DIR = Path('/ssd1/Datasets/CLIC')
