@@ -1,20 +1,5 @@
 import torch
 import torch.nn as nn
-import math
-import torch.utils.model_zoo as model_zoo
-
-
-__all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
-           'resnet152']
-
-
-model_urls = {
-    'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
-    'resnet34': 'https://download.pytorch.org/models/resnet34-333f7ec4.pth',
-    'resnet50': 'https://download.pytorch.org/models/resnet50-19c8e357.pth',
-    'resnet101': 'https://download.pytorch.org/models/resnet101-5d3b4d8f.pth',
-    'resnet152': 'https://download.pytorch.org/models/resnet152-b121ed2d.pth',
-}
 
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -95,11 +80,11 @@ class Bottleneck(nn.Module):
 
 
 class ResNet(nn.Module):
-
     def __init__(self, block, layers, num_classes=1000, deep_base=True):
         super(ResNet, self).__init__()
         self.deep_base = deep_base
         if not self.deep_base:
+            raise DeprecationWarning()
             self.inplanes = 64
             self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
             self.bn1 = nn.BatchNorm2d(64)
@@ -111,6 +96,7 @@ class ResNet(nn.Module):
             self.bn2 = nn.BatchNorm2d(64)
             self.conv3 = conv3x3(64, 128)
             self.bn3 = nn.BatchNorm2d(128)
+
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block, 64, layers[0])
@@ -163,30 +149,6 @@ class ResNet(nn.Module):
         return x
 
 
-def resnet18(pretrained=False, **kwargs):
-    """Constructs a ResNet-18 model.
-
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-    """
-    model = ResNet(BasicBlock, [2, 2, 2, 2], **kwargs)
-    if pretrained:
-        model.load_state_dict(model_zoo.load_url(model_urls['resnet18']))
-    return model
-
-
-def resnet34(pretrained=False, **kwargs):
-    """Constructs a ResNet-34 model.
-
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-    """
-    model = ResNet(BasicBlock, [3, 4, 6, 3], **kwargs)
-    if pretrained:
-        model.load_state_dict(model_zoo.load_url(model_urls['resnet34']))
-    return model
-
-
 def resnet50(pretrained=False, **kwargs):
     """Constructs a ResNet-50 model.
 
@@ -195,7 +157,7 @@ def resnet50(pretrained=False, **kwargs):
     """
     model = ResNet(Bottleneck, [3, 4, 6, 3], **kwargs)
     if pretrained:
-        # model.load_state_dict(model_zoo.load_url(model_urls['resnet50']))
+        raise NotImplementedError()
         model_path = './initmodel/resnet50_v2.pth'
         model.load_state_dict(torch.load(model_path), strict=False)
     return model
@@ -209,7 +171,7 @@ def resnet101(pretrained=False, **kwargs):
     """
     model = ResNet(Bottleneck, [3, 4, 23, 3], **kwargs)
     if pretrained:
-        # model.load_state_dict(model_zoo.load_url(model_urls['resnet101']))
+        raise NotImplementedError()
         model_path = './initmodel/resnet101_v2.pth'
         model.load_state_dict(torch.load(model_path), strict=False)
     return model
@@ -223,7 +185,23 @@ def resnet152(pretrained=False, **kwargs):
     """
     model = ResNet(Bottleneck, [3, 8, 36, 3], **kwargs)
     if pretrained:
-        # model.load_state_dict(model_zoo.load_url(model_urls['resnet152']))
+        raise NotImplementedError()
         model_path = './initmodel/resnet152_v2.pth'
         model.load_state_dict(torch.load(model_path), strict=False)
     return model
+
+
+if __name__ == '__main__':
+    from mycv.paths import MYCV_DIR
+    wpath = MYCV_DIR / 'weights/semseg_resnet50_v2.pth'
+    weights = torch.load(wpath)
+
+    model = resnet50()
+    model.load_state_dict(weights)
+    model = model.cuda()
+    model.eval()
+
+    from mycv.datasets.imagenet import imagenet_val
+    results = imagenet_val(model, split='val', img_size=224,
+                           batch_size=64, workers=4, input_norm=True)
+    print(results)
