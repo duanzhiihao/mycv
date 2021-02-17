@@ -1,7 +1,6 @@
 from pathlib import Path
 import json
 from tqdm import tqdm
-import random
 from PIL import Image
 import torch
 import torchvision.transforms as tvt
@@ -29,7 +28,7 @@ class ImageNetCls(torch.utils.data.Dataset):
     '''
     input_mean = torch.FloatTensor(RGB_MEAN).view(3, 1, 1)
     input_std  = torch.FloatTensor(RGB_STD).view(3, 1, 1)
-    def __init__(self, split='train', img_size=224, input_norm=True, color_aug=True):
+    def __init__(self, split='train', img_size=224, input_norm=True, color_aug=False):
         assert IMAGENET_DIR.is_dir() and isinstance(img_size, int)
 
         ann_path = IMAGENET_DIR / f'annotations/{split}.txt'
@@ -51,13 +50,18 @@ class ImageNetCls(torch.utils.data.Dataset):
 
         self.split     = split
         self.img_size  = img_size
-        if color_aug:
-            self.transform = tvt.Compose([
-                tvt.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.6, hue=0.04),
-                tvt.ToTensor()
-            ])
-        else:
-            self.transform = tvt.ToTensor()
+        # if color_aug:
+        #     self.transform = tvt.Compose([
+        #         tvt.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.6, hue=0.04),
+        #         tvt.ToTensor()
+        #     ])
+        # else:
+        #     self.transform = tvt.ToTensor()
+        self.transform = tvt.transforms.Compose([
+            tvt.transforms.RandomResizedCrop(img_size),
+            tvt.transforms.RandomHorizontalFlip(),
+            tvt.transforms.ToTensor()
+        ])
         self._input_norm = input_norm
 
     def __len__(self):
@@ -77,10 +81,10 @@ class ImageNetCls(torch.utils.data.Dataset):
         img_size = self.img_size
         if self.split.startswith('train'):
             # data augmentation
-            low, high = int(img_size/224*256), int(img_size/224*384)
-            img = tvf.resize(img, size=random.randint(low, high))
-            img = augUtils.random_crop(img, crop_hw=(img_size,img_size))
-            img = augUtils.random_hflip(img)
+            # low, high = int(img_size/224*256), int(img_size/224*384)
+            # img = tvf.resize(img, size=random.randint(low, high))
+            # img = augUtils.random_crop(img, crop_hw=(img_size,img_size))
+            # img = augUtils.random_hflip(img)
             im = self.transform(img)
         elif self.split.startswith('val'):
             # resize and center crop
@@ -94,7 +98,7 @@ class ImageNetCls(torch.utils.data.Dataset):
 
         # normalize such that mean = 0 and std = 1
         if self._input_norm:
-            im = (im - self.input_mean) / self.input_std
+            im = im.sub_(self.input_mean).div_(self.input_std)
 
         return im, label
 
@@ -129,15 +133,15 @@ def imagenet_val(model: torch.nn.Module, split='val', testloader=None,
 
     # traverse the dataset
     predictions, labels_all = [], []
-    for imgs, labels in tqdm(testloader):
-        # _debug(imgs)
-        imgs = imgs.to(device=device)
-        with torch.no_grad():
+    with torch.no_grad():
+        for imgs, labels in tqdm(testloader):
+            # _debug(imgs)
+            imgs = imgs.to(device=device)
             p = forward_(imgs)
-        assert p.dim() == 2 and labels.max().item() < p.shape[1]
-        _, p = torch.max(p, dim=1)
-        predictions.append(p)
-        labels_all.append(labels)
+            assert p.dim() == 2 and labels.max().item() < p.shape[1]
+            _, p = torch.max(p, dim=1)
+            predictions.append(p)
+            labels_all.append(labels)
 
     predictions = torch.cat(predictions, dim=0).cpu()
     labels_all  = torch.cat(labels_all,  dim=0)
@@ -185,12 +189,12 @@ if __name__ == "__main__":
     #     imgs = imgs
 
     from mycv.models.cls.resnet import resnet50
-    from mycv.paths import WEIGHTS_DIR, MYCV_DIR
-    model = resnet50(num_classes=200)
-    # model.load_state_dict(torch.load(WEIGHTS_DIR / 'resnet50-19c8e357.pth'))
-    model.load_state_dict(torch.load(MYCV_DIR / 'runs/imagenet/res50_1/best.pt')['model'])
+    from mycv.paths import MYCV_DIR
+    model = resnet50(num_classes=1000)
+    model.load_state_dict(torch.load(MYCV_DIR / 'weights/resnet50-19c8e357.pth'))
+    # model.load_state_dict(torch.load(MYCV_DIR / 'runs/imagenet/res50_1/best.pt')['model'])
     model = model.cuda()
     model.eval()
-    results = imagenet_val(model, split='val200_600',
-                img_size=224, batch_size=64, workers=8, input_norm=False)
+    results = imagenet_val(model, split='val',
+                img_size=224, batch_size=64, workers=4, input_norm=True)
     print(results)
