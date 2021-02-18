@@ -38,6 +38,9 @@ class PSPNet(nn.Module):
 
         if layers == 50:
             resnet = resnet50()
+            from mycv.paths import MYCV_DIR
+            wpath = MYCV_DIR / 'weights/semseg_resnet50_v2.pth'
+            resnet.load_state_dict(torch.load(wpath))
         else:
             raise NotImplementedError()
         self.layer0 = nn.Sequential(
