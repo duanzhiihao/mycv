@@ -1,16 +1,17 @@
 import torch
 from torch import nn
-import torch.nn.functional as F
+import torch.nn.functional as tnf
 
 from mycv.external.semseg._resnet import resnet50
 
 class PPM(nn.Module):
     def __init__(self, in_dim, reduction_dim, bins):
         super(PPM, self).__init__()
+        self.official_sizes = [1, 2, 3, 6]
         self.features = []
         for bin in bins:
             self.features.append(nn.Sequential(
-                nn.AdaptiveAvgPool2d(bin),
+                nn.Identity(), # identity here to be compatible with official weights
                 nn.Conv2d(in_dim, reduction_dim, kernel_size=1, bias=False),
                 nn.BatchNorm2d(reduction_dim),
                 nn.ReLU(inplace=True)
@@ -18,10 +19,15 @@ class PPM(nn.Module):
         self.features = nn.ModuleList(self.features)
 
     def forward(self, x):
-        x_size = x.size()
+        xh, xw = x.shape[2:]
         out = [x]
-        for f in self.features:
-            out.append(F.interpolate(f(x), x_size[2:], mode='bilinear', align_corners=True))
+        for f, sz in zip(self.features, self.official_sizes):
+            # resize the feature map by scales from the official implementation
+            _output_size = (max(sz, round(sz*xh/89)), max(sz, round(sz*xw/89)))
+            _x = tnf.adaptive_avg_pool2d(x, _output_size)
+            _x = f(_x)
+            _x = tnf.interpolate(_x, (xh, xw), mode='bilinear', align_corners=True)
+            out.append(_x)
         return torch.cat(out, 1)
 
 
@@ -85,6 +91,7 @@ class PSPNet(nn.Module):
 
     def forward(self, x, y=None):
         assert (x.shape[2]-1) % 8 == 0 and (x.shape[3]-1) % 8 == 0
+        # assert x.shape[2] % 8 == 0 and x.shape[3] % 8 == 0
         h, w = x.shape[2:4]
 
         x = self.layer0(x)
@@ -94,11 +101,12 @@ class PSPNet(nn.Module):
         x = self.layer4(x_tmp)
         x = self.ppm(x)
         x = self.cls(x)
-        x = F.interpolate(x, size=(h, w), mode='bilinear', align_corners=True)
+        x = tnf.interpolate(x, size=(h, w), mode='bilinear', align_corners=True)
 
         if self.training:
+            assert y is not None
             aux = self.aux(x_tmp)
-            aux = F.interpolate(aux, size=(h, w), mode='bilinear', align_corners=True)
+            aux = tnf.interpolate(aux, size=(h, w), mode='bilinear', align_corners=True)
             main_loss = self.criterion(x, y)
             aux_loss = self.criterion(aux, y)
             return torch.max(x.detach(), dim=1)[1], main_loss, aux_loss
