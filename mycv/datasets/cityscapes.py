@@ -131,30 +131,30 @@ def evaluate_semseg(model, testloader=None, input_norm=None):
     ignore_label = testloader.dataset.ignore_label
 
     sum_inter, sum_union, sum_tgt = 0, 0, 0
-    for imgs, labels in tqdm(testloader):
-        # _debug(labels[0])
-        assert imgs.shape[2:] == labels.shape[1:] == (1024, 2048)
-        imgs, labels = imgs.to(device=device), labels.to(device=device)
-        new = torch.zeros(1, 3, 1025, 2049, device=device)
-        new[:, :, :1024, :2048] = imgs
-        with torch.no_grad():
+    with torch.no_grad():
+        for imgs, labels in tqdm(testloader):
+            # _debug(labels[0])
+            assert imgs.shape[2:] == labels.shape[1:] == (1024, 2048)
+            imgs, labels = imgs.to(device=device), labels.to(device=device)
+            new = torch.zeros(1, 3, 1025, 2049, device=device)
+            new[:, :, :1024, :2048] = imgs
             output = forward_(new)
-        assert output.dim() == 4
+            assert output.dim() == 4
 
-        output, label = output.squeeze(0), labels.squeeze(0)
-        output = output[:, :1024, :2048]
-        output = torch.argmax(output, dim=0)
-        output[label == ignore_label] = ignore_label
-        tpmask = (output == label) # true positive (ie. intersection) for all classes
-        intersection = output[tpmask]
-        inter = torch.histc(intersection, bins=num_cls, min=0, max=num_cls-1)
-        area_p = torch.histc(output, bins=num_cls, min=0, max=num_cls-1)
-        area_t = torch.histc(label,  bins=num_cls, min=0, max=num_cls-1)
-        union = area_p + area_t - inter
-        # ious = area_inter / (area_output + area_target - area_inter)
-        sum_inter += inter
-        sum_union += union
-        sum_tgt += area_t
+            output, label = output.squeeze(0), labels.squeeze(0)
+            output = output[:, :1024, :2048]
+            output = torch.argmax(output, dim=0)
+            output[label == ignore_label] = ignore_label
+            tpmask = (output == label) # true positive (ie. intersection) for all classes
+            intersection = output[tpmask]
+            inter = torch.histc(intersection, bins=num_cls, min=0, max=num_cls-1)
+            area_p = torch.histc(output, bins=num_cls, min=0, max=num_cls-1)
+            area_t = torch.histc(label,  bins=num_cls, min=0, max=num_cls-1)
+            union = area_p + area_t - inter
+            # ious = area_inter / (area_output + area_target - area_inter)
+            sum_inter += inter
+            sum_union += union
+            sum_tgt += area_t
     ious = sum_inter / sum_union
     miou = ious.mean()
     acc = (sum_inter / sum_tgt).mean()
