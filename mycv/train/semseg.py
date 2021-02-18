@@ -89,11 +89,12 @@ def train():
     cfg.input_norm = True
     cfg.aux_weight = 0.4
     # optimizer
-    cfg.lr = 0.01
+    cfg.lr = 0.006
     cfg.momentum = 0.9
     cfg.weight_decay = 0.0001
+    cfg.accum_batch_size = 16
     # lr scheduler
-    cfg.lrf = 0.2 # min lr factor
+    cfg.lrf = 0.1 # min lr factor
     cfg.lr_warmup_epochs = 1
     # EMA
     cfg.ema_warmup_epochs = 16

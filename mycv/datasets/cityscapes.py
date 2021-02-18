@@ -2,6 +2,7 @@ from tqdm import tqdm
 import collections
 import cv2
 import torch
+import torch.cuda.amp as amp
 
 from mycv.datasets.imagenet import RGB_MEAN, RGB_STD
 from mycv.paths import CITYSCAPES_DIR
@@ -119,7 +120,7 @@ class Cityscapes(torch.utils.data.Dataset):
 def evaluate_semseg(model, testloader=None, input_norm=None):
     model.eval()
     device = next(model.parameters()).device
-    forward_ = getattr(model, 'forward_cls', model.forward)
+    forward_ = getattr(model, 'forward_sem', model.forward)
 
     if testloader is None:
         assert input_norm is not None

@@ -119,5 +119,5 @@ if __name__ == '__main__':
     model.load_state_dict(weights)
     model.eval()
 
-    results = evaluate_semseg(model)
+    results = evaluate_semseg(model, input_norm=True)
     print(results)
