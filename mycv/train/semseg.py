@@ -79,7 +79,7 @@ def train():
     parser.add_argument('--batch_size', type=int,  default=8)
     parser.add_argument('--amp',        type=bool, default=True)
     parser.add_argument('--ema',        type=bool, default=True)
-    parser.add_argument('--epochs',     type=int,  default=200)
+    parser.add_argument('--epochs',     type=int,  default=160)
     parser.add_argument('--device',     type=int,  default=[0], nargs='+')
     parser.add_argument('--workers',    type=int,  default=2)
     parser.add_argument('--wbmode',     type=str,  default='disabled')
@@ -255,6 +255,8 @@ def train():
             # ----Mini batch end
         # ----Epoch end
 
+        if epoch % 2 != 0:
+            continue
         # Evaluation
         _log_dic = {'general/epoch': epoch}
         _eval_model = model.module if is_parallel(model) else model
