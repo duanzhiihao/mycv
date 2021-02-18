@@ -93,6 +93,7 @@ def train():
     cfg.momentum = 0.9
     cfg.weight_decay = 0.0001
     cfg.accum_batch_size = 16
+    cfg.accum_num = max(1, round(cfg.accum_batch_size // cfg.batch_size))
     # lr scheduler
     cfg.lrf = 0.1 # min lr factor
     cfg.lr_warmup_epochs = 1
@@ -113,6 +114,7 @@ def train():
     device = torch.device(f'cuda:{cfg.device[0]}')
     bs_each = cfg.batch_size // len(cfg.device)
     print('Batch size on each single GPU =', bs_each, '\n')
+    print(f'Gradient accmulation: {cfg.accum_num} backwards() -> one step()')
 
     # Dataset
     print('Initializing Datasets and Dataloaders...')
@@ -182,7 +184,7 @@ def train():
     # Exponential moving average
     if cfg.ema:
         ema = ModelEMA(model, decay=0.9999)
-        ema.updates = start_iter  # set EMA updates
+        ema.updates = start_iter // cfg.accum_num  # set EMA updates
         ema.warmup = cfg.ema_warmup_epochs * len(trainloader) # set EMA warmup
     else:
         ema = None
@@ -216,11 +218,13 @@ def train():
                 # loss is averaged within image, sumed over batch, and sumed over gpus
             # backward, update
             scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-            optimizer.zero_grad()
-            if cfg.ema:
-                ema.update(model)
+
+            if niter % cfg.accum_num == 0:
+                scaler.step(optimizer)
+                scaler.update()
+                optimizer.zero_grad()
+                if cfg.ema:
+                    ema.update(model)
             # Scheduler
             scheduler.step()
 
