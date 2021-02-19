@@ -96,7 +96,7 @@ def train():
     cfg.accum_batch_size = 16
     cfg.accum_num = max(1, round(cfg.accum_batch_size // cfg.batch_size))
     # lr scheduler
-    cfg.lrf = 0.02 # min lr factor
+    cfg.lrf = 0.01 # min lr factor
     cfg.lr_warmup_epochs = 1
     # EMA
     cfg.ema_warmup_epochs = 16
