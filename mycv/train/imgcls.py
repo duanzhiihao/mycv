@@ -37,11 +37,11 @@ def train():
     parser.add_argument('--batch_size', type=int,  default=256)
     parser.add_argument('--amp',        type=bool, default=True)
     parser.add_argument('--ema',        type=bool, default=True)
-    parser.add_argument('--epochs',     type=int,  default=100)
+    parser.add_argument('--epochs',     type=int,  default=90)
     parser.add_argument('--study',      type=bool, default=False)
     parser.add_argument('--device',     type=int,  default=[0], nargs='+')
     parser.add_argument('--workers',    type=int,  default=6)
-    parser.add_argument('--wbmode',     type=str,  default='online')
+    parser.add_argument('--wbmode',     type=str,  default='disabled')
     cfg = parser.parse_args()
     # model
     cfg.img_size = 224
@@ -52,10 +52,10 @@ def train():
     cfg.weight_decay = 0.0001
     cfg.nesterov = False
     # lr scheduler
-    cfg.lrf = 0.2 # min lr factor
+    cfg.lrf = 0.01 # min lr factor
     cfg.lr_warmup_epochs = 0
     # EMA
-    cfg.ema_warmup_epochs = 4
+    cfg.ema_warmup_epochs = 8
 
     # check arguments
     metric: str = 'top1_real'

@@ -80,14 +80,14 @@ def train():
     parser.add_argument('--batch_size', type=int,  default=8)
     parser.add_argument('--amp',        type=bool, default=True)
     parser.add_argument('--ema',        type=bool, default=True)
-    parser.add_argument('--epochs',     type=int,  default=160)
+    parser.add_argument('--epochs',     type=int,  default=120)
     parser.add_argument('--device',     type=int,  default=[0], nargs='+')
     parser.add_argument('--workers',    type=int,  default=2)
     parser.add_argument('--wbmode',     type=str,  default='disabled')
     cfg = parser.parse_args()
     # model
-    cfg.img_size = 713
-    cfg.input_norm = True
+    cfg.img_size = 640
+    cfg.input_norm = False
     cfg.aux_weight = 0.4
     # optimizer
     cfg.lr = 0.006
@@ -96,7 +96,7 @@ def train():
     cfg.accum_batch_size = 16
     cfg.accum_num = max(1, round(cfg.accum_batch_size // cfg.batch_size))
     # lr scheduler
-    cfg.lrf = 0.1 # min lr factor
+    cfg.lrf = 0.02 # min lr factor
     cfg.lr_warmup_epochs = 1
     # EMA
     cfg.ema_warmup_epochs = 16
