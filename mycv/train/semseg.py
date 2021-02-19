@@ -1,6 +1,7 @@
 from mycv.utils.general import disable_multithreads
 disable_multithreads()
 import os
+import time
 from pathlib import Path
 import argparse
 from tqdm import tqdm
@@ -115,6 +116,7 @@ def train():
     bs_each = cfg.batch_size // len(cfg.device)
     print('Batch size on each single GPU =', bs_each, '\n')
     print(f'Gradient accmulation: {cfg.accum_num} backwards() -> one step()')
+    print(f'Effective batch size: {cfg.accum_batch_size}')
 
     # Dataset
     print('Initializing Datasets and Dataloaders...')
@@ -202,6 +204,7 @@ def train():
         model.train()
 
         epoch_loss, epoch_acc = 0.0, 0.0
+        time.sleep(0.1)
         print('\n' + pbar_title) # title
         pbar = tqdm(enumerate(trainloader), total=len(trainloader))
         for bi, (imgs, labels) in pbar:
@@ -215,6 +218,7 @@ def train():
             with amp.autocast(enabled=cfg.amp):
                 outputs, main_loss, aux_loss = model(imgs, labels)
                 loss = main_loss + cfg.aux_weight * aux_loss
+                loss = loss / cfg.accum_num
                 # loss is averaged within image, sumed over batch, and sumed over gpus
             # backward, update
             scaler.scale(loss).backward()
