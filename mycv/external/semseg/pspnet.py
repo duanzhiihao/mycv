@@ -8,7 +8,7 @@ class PPM(nn.Module):
     def __init__(self, in_dim, reduction_dim, bins):
         super(PPM, self).__init__()
         self.official_sizes = [1, 2, 3, 6]
-        self.features = []
+        self.features = nn.ModuleList()
         for bin in bins:
             self.features.append(nn.Sequential(
                 nn.Identity(), # identity here to be compatible with official weights
@@ -16,7 +16,6 @@ class PPM(nn.Module):
                 nn.BatchNorm2d(reduction_dim),
                 nn.ReLU(inplace=True)
             ))
-        self.features = nn.ModuleList(self.features)
 
     def forward(self, x):
         xh, xw = x.shape[2:]
@@ -41,6 +40,7 @@ class PSPNet(nn.Module):
         assert 2048 % len(bins) == 0
         assert num_class > 1
         self.criterion = nn.CrossEntropyLoss(ignore_index=255)
+        self.odd = False
 
         if layers == 50:
             resnet = resnet50()
@@ -90,8 +90,10 @@ class PSPNet(nn.Module):
         )
 
     def forward(self, x, y=None):
-        assert (x.shape[2]-1) % 8 == 0 and (x.shape[3]-1) % 8 == 0
-        # assert x.shape[2] % 8 == 0 and x.shape[3] % 8 == 0
+        if self.odd:
+            assert (x.shape[2]-1) % 8 == 0 and (x.shape[3]-1) % 8 == 0
+        else:
+            assert x.shape[2] % 8 == 0 and x.shape[3] % 8 == 0
         h, w = x.shape[2:4]
 
         x = self.layer0(x)
