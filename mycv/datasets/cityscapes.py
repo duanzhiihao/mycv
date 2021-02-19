@@ -137,8 +137,11 @@ def evaluate_semseg(model, testloader=None, input_norm=None):
             # _debug(labels[0])
             assert imgs.shape[2:] == labels.shape[1:] == (1024, 2048)
             imgs, labels = imgs.to(device=device), labels.to(device=device)
-            new = torch.zeros(1, 3, 1025, 2049, device=device)
-            new[:, :, :1024, :2048] = imgs
+            if model.odd:
+                new = torch.zeros(1, 3, 1025, 2049, device=device)
+                new[:, :, :1024, :2048] = imgs
+            else:
+                new = imgs
             output = forward_(new)
             assert output.dim() == 4
 
