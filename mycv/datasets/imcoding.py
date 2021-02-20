@@ -205,7 +205,7 @@ def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, bar=Fal
             bpp = cal_bpp(p1, imh*imw) + cal_bpp(p2, imh*imw)
             bpp = bpp.item()
         else:
-            bpp = 0
+            bpp = -1024
         # if True: # debugging
         #     import matplotlib.pyplot as plt
         #     plt.figure(); plt.imshow(im)

@@ -21,6 +21,7 @@ class NLAIC(nn.Module):
         self.encoder = Enc(input_channels, N1, N2, M, M1,
                            enable_hyper=enable_bpp) # 22.5M
         self.decoder = Dec(input_channels, N1, M, M1) # 13.8M
+        self.enable_bpp = enable_bpp
         if not enable_bpp:
             return
 
@@ -35,14 +36,16 @@ class NLAIC(nn.Module):
             xq = UniverseQuant.apply(x)
         else:
             xq = torch.round(x)
-
-        xq2, xp2 = self.factorized_entropy_func(xhyp)
-        x3 = self.hyper_dec(xq2)
-        hyper_dec = self.p(x3)
-        xp3 = self.context(xq, hyper_dec) # 2GB
-
         rec = self.decoder(xq) # 3GB
-        return rec, (xp2, xp3)
+
+        if self.enable_bpp:
+            xq2, xp2 = self.factorized_entropy_func(xhyp)
+            x3 = self.hyper_dec(xq2)
+            hyper_dec = self.p(x3)
+            xp3 = self.context(xq, hyper_dec) # 2GB
+            return rec, (xp2, xp3)
+        else:
+            return rec, None
 
     def encode(self, x):
         '''
@@ -225,12 +228,12 @@ class Dec(nn.Module):
 
 
 if __name__ == "__main__":
-    from mycv.paths import WEIGHTS_DIR
+    from mycv.paths import MYCV_DIR
     from mycv.utils.torch_utils import load_partial
     model = NLAIC(enable_bpp=True)
-    load_partial(model, WEIGHTS_DIR/'nlaic_msssim64.pt')
-    model.eval()
+    load_partial(model, MYCV_DIR / 'weights/nlaic_msssim64.pt')
     model = model.cuda()
+    model.eval()
 
     from mycv.datasets.imcoding import nic_evaluate
     results = nic_evaluate(model, input_norm=False, bar=True)
