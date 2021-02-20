@@ -11,7 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import torch.cuda.amp as amp
-from torch.optim.lr_scheduler import LambdaLR
+# from torch.optim.lr_scheduler import LambdaLR
 
 from mycv.utils.general import increment_dir
 from mycv.utils.torch_utils import set_random_seeds, ModelEMA, warmup_cosine, is_parallel
@@ -56,7 +56,7 @@ def train():
     cfg.lrf = 0.01 # min lr factor
     cfg.lr_warmup_epochs = 0
     # EMA
-    cfg.ema_warmup_epochs = 16
+    cfg.ema_warmup_epochs = 4
 
     # check arguments
     metric: str = 'top1_real'
@@ -158,10 +158,10 @@ def train():
         print(wbrun.id, file=f)
 
     # lr scheduler
-    _warmup = cfg.lr_warmup_epochs * len(trainloader)
-    _total = epochs * len(trainloader)
-    lr_func = lambda x: warmup_cosine(x, cfg.lrf, _warmup, _total)
-    scheduler = LambdaLR(optimizer, lr_lambda=lr_func, last_epoch=start_iter - 1)
+    # _warmup = cfg.lr_warmup_epochs * len(trainloader)
+    # _total = epochs * len(trainloader)
+    # lr_func = lambda x: warmup_cosine(x, cfg.lrf, _warmup, _total)
+    # scheduler = LambdaLR(optimizer, lr_lambda=lr_func, last_epoch=start_iter - 1)
 
     # Exponential moving average
     if cfg.ema:
@@ -183,6 +183,7 @@ def train():
     )
     niter = s = None
     for epoch in range(start_epoch, epochs):
+        adjust_learning_rate(optimizer, epoch, cfg.lr)
         model.train()
 
         train_loss, train_acc = 0.0, 0.0
@@ -214,7 +215,7 @@ def train():
             if cfg.ema:
                 ema.update(model)
             # Scheduler
-            scheduler.step()
+            # scheduler.step()
 
             # logging
             cur_lr = optimizer.param_groups[0]['lr']
@@ -302,6 +303,14 @@ def get_model(name, num_class):
     else:
         raise ValueError()
     return model
+
+
+def adjust_learning_rate(optimizer, epoch, base_lr):
+    """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
+    lr = base_lr * (0.1 ** (epoch // 30))
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
 
 class gradient_logger:
     def __init__(self, model, save_dir) -> None:
