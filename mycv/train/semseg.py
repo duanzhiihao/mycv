@@ -99,7 +99,7 @@ def train():
     cfg.lrf = 0.01 # min lr factor
     cfg.lr_warmup_epochs = 1
     # EMA
-    cfg.ema_warmup_epochs = 16
+    cfg.ema_warmup_epochs = 8
 
     # check arguments
     metric: str = 'miou'

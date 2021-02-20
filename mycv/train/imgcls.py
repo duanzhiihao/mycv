@@ -3,6 +3,7 @@ disable_multithreads()
 import os
 from pathlib import Path
 import argparse
+import time
 from tqdm import tqdm
 from collections import defaultdict
 import wandb
@@ -55,7 +56,7 @@ def train():
     cfg.lrf = 0.01 # min lr factor
     cfg.lr_warmup_epochs = 0
     # EMA
-    cfg.ema_warmup_epochs = 8
+    cfg.ema_warmup_epochs = 16
 
     # check arguments
     metric: str = 'top1_real'
@@ -185,6 +186,7 @@ def train():
         model.train()
 
         train_loss, train_acc = 0.0, 0.0
+        time.sleep(0.1)
         print('\n' + pbar_title) # title
         pbar = tqdm(enumerate(trainloader), total=len(trainloader))
         for i, (imgs, labels) in pbar:
