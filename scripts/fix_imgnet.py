@@ -36,7 +36,7 @@ def remove_exif(split: str='train'):
         piexif.remove(str(impath))
 
 
-def resize_large_imgs(max_size=1024):
+def resize_large_imgs(max_size=640):
     split = 'train'
     annpath = IMAGENET_DIR / f'annotations/{split}.txt'
     with open(annpath, 'r') as f:
@@ -51,7 +51,7 @@ def resize_large_imgs(max_size=1024):
         im = cv2.imread(impath)
         im = scale(im, max_size, side='shorter')
         
-        backup = IMAGENET_DIR / 'large_images' / imname
+        backup = IMAGENET_DIR / f'large_images_{max_size}' / imname
         if not backup.parent.is_dir():
             backup.parent.mkdir(parents=True)
         os.rename(impath, backup)
