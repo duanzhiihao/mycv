@@ -63,7 +63,8 @@ def main():
         rec = cv2.cvtColor(rec, cv2.COLOR_RGB2BGR)
         # cv2.imwrite('rec.png', rec)
 
-        savepath = IMAGENET_DIR / save_dir / imname
+        svname = imname.replace('.JPEG', '.png')
+        savepath = IMAGENET_DIR / save_dir / svname
         if not savepath.parent.is_dir():
             savepath.parent.mkdir(parents=True)
 

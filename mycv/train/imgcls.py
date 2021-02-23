@@ -53,8 +53,8 @@ def train():
     cfg.weight_decay = 0.0001
     cfg.nesterov = False
     # lr scheduler
-    cfg.lrf = 0.01 # min lr factor
-    cfg.lr_warmup_epochs = 0
+    # cfg.lrf = 0.01 # min lr factor
+    # cfg.lr_warmup_epochs = 0
     # EMA
     cfg.ema_warmup_epochs = 4
 
