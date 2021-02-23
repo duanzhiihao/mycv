@@ -21,3 +21,11 @@ Resnet-50, imagenet200_600
 | res50_1 | 0.001 | SGD          |           | 75.3/75.3       | 78.1/76.5     |
 | res50_5 |       | SGD+nesterov |           | 75.8/75.4       | 77.6/76.8     |
 |         | 0.01  | SGD          | mean      | 72.9/72.9       | 75.7/74.8     |
+
+
+Resnet-50, full imagenet
+| Run     | lr    | lr schedule   | Reduction | Epochs | Plain best/last | EMA best/last |
+|---------|-------|---------------|-----------|--------|-----------------|---------------|
+| DEFAULT |       |               |           |        |                 |               |
+| res50_1 | 0.001 | cosine 0.2    | sum       | 60/100 | 68.19/68.13     | 70.83/70.55   |
+| res50_1 | 0.1   | *0.1 every 30 | mean      | 90     |                 | 74.28running  |
