@@ -14,7 +14,7 @@ import torch.cuda.amp as amp
 # from torch.optim.lr_scheduler import LambdaLR
 
 from mycv.utils.general import increment_dir
-from mycv.utils.torch_utils import set_random_seeds, ModelEMA, warmup_cosine, is_parallel
+from mycv.utils.torch_utils import set_random_seeds, ModelEMA, adjust_lr_threestep, is_parallel
 from mycv.utils.image import save_tensor_images
 from mycv.datasets.imagenet import ImageNetCls, imagenet_val
 
@@ -183,7 +183,7 @@ def train():
     )
     niter = s = None
     for epoch in range(start_epoch, epochs):
-        adjust_learning_rate(optimizer, epoch, cfg.lr)
+        adjust_lr_threestep(optimizer, epoch, cfg.lr, total_epoch=epochs)
         model.train()
 
         train_loss, train_acc = 0.0, 0.0
@@ -303,13 +303,6 @@ def get_model(name, num_class):
     else:
         raise ValueError()
     return model
-
-
-def adjust_learning_rate(optimizer, epoch, base_lr):
-    """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = base_lr * (0.1 ** (epoch // 30))
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
 
 
 class gradient_logger:

@@ -113,6 +113,22 @@ def warmup_cosine(n, min_lrf, warmup_iter, total_iter):
     return factor
 
 
+def adjust_lr_threestep(optimizer, cur_epoch, base_lr, total_epoch):
+    """ Sets the learning rate to the initial LR decayed by 10 every total/3 epochs
+
+    Args:
+        optimizer (torch.optim.Optimizer): optimizer
+        cur_epoch (int): current epoch
+        base_lr (float): base learning rate
+        total_epoch (int): total epoch
+    """
+    assert total_epoch >= 3
+    period = math.ceil(total_epoch / 3)
+    lr = base_lr * (0.1 ** (cur_epoch // period))
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
+
 def fuse_conv_and_bn(conv, bn):
     # Fuse convolution and batchnorm layers https://tehnokv.com/posts/fusing-batchnorm-and-conv/
 
