@@ -132,7 +132,7 @@ def crop_divisible(im: np.ndarray, div: int):
     return cropped
 
 
-def scale(im: np.ndarray, size: int, side='shorter'):
+def scale(im: np.ndarray, size: int, shorter=True):
     """ resize the image such that the shorter/longer side of the image = size
 
     Args:
@@ -141,12 +141,10 @@ def scale(im: np.ndarray, size: int, side='shorter'):
     """
     assert is_image(im, cv2_ok=True, pil_ok=False)
     old_hw = im.shape[:2]
-    if side == 'longer':
-        ratio = size / max(old_hw[0], old_hw[1]) # Scale ratio (new / old)
-    elif side == 'shorter':
+    if shorter:
         ratio = size / min(old_hw[0], old_hw[1]) # Scale ratio (new / old)
     else:
-        raise ValueError()
+        ratio = size / max(old_hw[0], old_hw[1]) # Scale ratio (new / old)
     if ratio != 1:
         new_h = round(old_hw[0] * ratio)
         new_w = round(old_hw[1] * ratio)
@@ -161,7 +159,7 @@ def center_crop(im: np.ndarray, crop_hw: tuple):
         im (np.ndarray): image
         crop_hw (tuple): target (height, width)
     """
-    assert is_image(im)
+    assert is_image(im, cv2_ok=True, pil_ok=False)
     height, width = im.shape[:2]
     ch, cw = crop_hw
     if height < ch or width < cw:
