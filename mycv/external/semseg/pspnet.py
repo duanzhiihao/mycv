@@ -125,9 +125,10 @@ if __name__ == '__main__':
 
     from mycv.paths import MYCV_DIR
     from mycv.datasets.cityscapes import evaluate_semseg
-    weights = torch.load(MYCV_DIR / 'weights/psp50_epoch_200.pt')
+    # weights = torch.load(MYCV_DIR / 'weights/psp50_epoch_200.pt')
+    weights = torch.load(MYCV_DIR / 'weights/psp50_640_ep120.pt')
     model.load_state_dict(weights)
     model.eval()
 
-    results = evaluate_semseg(model, input_norm=True)
+    results = evaluate_semseg(model, input_norm=False)
     print(results)

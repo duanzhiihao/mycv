@@ -58,6 +58,8 @@ def load_partial(model, weights, verbose=True):
     for k,v in external_state.items():
         if k in self_state and self_state[k].shape == v.shape:
             new_dic[k] = v
+        else:
+            debug = 1
     model.load_state_dict(new_dic, strict=False)
     if verbose:
         print(f'{type(model).__name__}: {len(self_state)} layers,',

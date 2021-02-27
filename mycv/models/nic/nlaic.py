@@ -231,10 +231,15 @@ if __name__ == "__main__":
     from mycv.paths import MYCV_DIR
     from mycv.utils.torch_utils import load_partial
     model = NLAIC(enable_bpp=True)
-    load_partial(model, MYCV_DIR / 'weights/nlaic_msssim64.pt')
+    # load_partial(model, MYCV_DIR / 'weights/nlaic/msssim4.pkl')
+    # load_partial(model.context, MYCV_DIR / 'weights/nlaic/msssim4p.pkl')
+    # torch.save(model.state_dict(), MYCV_DIR / 'weights/nlaic/nlaic_ms4_2.pt')
+    # exit()
+    # load_partial(model, MYCV_DIR / 'weights/nlaic/nlaic_ms4.pt')
+    load_partial(model, MYCV_DIR / 'weights/nlaic/nlaic_mse200_2.pt')
     model = model.cuda()
     model.eval()
 
     from mycv.datasets.imcoding import nic_evaluate
-    results = nic_evaluate(model, input_norm=False, bar=True)
+    results = nic_evaluate(model, input_norm=False, bar=True, dataset='imagenet')
     print(results)

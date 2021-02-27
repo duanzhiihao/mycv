@@ -163,3 +163,19 @@ def resnet152(num_classes):
     """
     model = ResNet(Bottleneck, [3, 8, 36, 3], num_classes=num_classes)
     return model
+
+
+if __name__ == '__main__':
+    from tqdm import tqdm
+    from thop import profile, clever_format
+    model = resnet50(1000)
+    input = torch.randn(1, 3, 224, 224)
+    macs, params = profile(model, inputs=(input, ))
+    macs, params = clever_format([macs, params], "%.3f")
+    print(macs, params)
+
+    model = model.cuda()
+    model.eval()
+    for _ in tqdm(range(4096)):
+        x = torch.randn(1, 3, 224, 224, device='cuda:0')
+        y = model(x)

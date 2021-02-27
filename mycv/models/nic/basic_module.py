@@ -76,7 +76,16 @@ class UniverseQuant(torch.autograd.Function):
             -0.5*torch.ones(x.size())*(2**b), 0.5*torch.ones(x.size())*(2**b)
         ).sample().to(device=x.device)
         return torch.round(x+uniform_distribution)-uniform_distribution
+        # x.add_(uniform_distribution).round_().add_(-uniform_distribution)
+        # return x
 
     @staticmethod
     def backward(ctx, g):
         return g
+
+
+if __name__ == '__main__':
+    x = torch.randn(256, 192, 14, 14)
+    x = UniverseQuant.apply(x)
+    debug = 1
+
