@@ -36,6 +36,7 @@ def train():
     parser.add_argument('--model',      type=str,  default='res50')
     parser.add_argument('--resume',     type=str,  default='')
     parser.add_argument('--batch_size', type=int,  default=256)
+    parser.add_argument('--accum_bs',   type=int,  default=None)
     parser.add_argument('--amp',        type=bool, default=True)
     parser.add_argument('--ema',        type=bool, default=True)
     parser.add_argument('--epochs',     type=int,  default=90)
@@ -52,9 +53,8 @@ def train():
     cfg.momentum = 0.9
     cfg.weight_decay = 0.0001
     cfg.nesterov = False
-    # lr scheduler
-    # cfg.lrf = 0.01 # min lr factor
-    # cfg.lr_warmup_epochs = 0
+    cfg.accum_batch_size = cfg.accum_bs if cfg.accum_bs is not None else cfg.batch_size
+    cfg.accum_num = max(1, round(cfg.accum_batch_size // cfg.batch_size))
     # EMA
     cfg.ema_warmup_epochs = 4
 
@@ -71,7 +71,9 @@ def train():
         print(f'Using device {_id}:', torch.cuda.get_device_properties(_id))
     device = torch.device(f'cuda:{cfg.device[0]}')
     bs_each = cfg.batch_size // len(cfg.device)
-    print('Batch size on each single GPU =', bs_each, '\n')
+    print('Batch size on each single GPU =', bs_each)
+    print(f'Gradient accmulation: {cfg.accum_num} backwards() -> one step()')
+    print(f'Effective batch size: {cfg.accum_batch_size}', '\n')
 
     # Dataset
     print('Initializing Datasets and Dataloaders...')
@@ -166,7 +168,7 @@ def train():
     # Exponential moving average
     if cfg.ema:
         ema = ModelEMA(model, decay=0.9999)
-        ema.updates = start_iter  # set EMA updates
+        ema.updates = start_iter // cfg.accum_num # set EMA updates
         ema.warmup = cfg.ema_warmup_epochs * len(trainloader) # set EMA warmup
     else:
         ema = None
@@ -201,7 +203,8 @@ def train():
             with amp.autocast(enabled=cfg.amp):
                 p = model(imgs)
                 loss = loss_func(p, labels) #* nB
-                # loss is averaged within image, sumed over batch, and sumed over gpus
+                loss = loss / cfg.accum_num / len(cfg.device)
+                # loss is averaged over batch, and averaged over gpus
             # backward, update
             scaler.scale(loss).backward()
 
@@ -209,13 +212,12 @@ def train():
                 # log_gradients(model, log_dir / 'gradients', niter)
                 glog.log(model)
 
-            scaler.step(optimizer)
-            scaler.update()
-            optimizer.zero_grad()
-            if cfg.ema:
-                ema.update(model)
-            # Scheduler
-            # scheduler.step()
+            if niter % cfg.accum_num == 0:
+                scaler.step(optimizer)
+                scaler.update()
+                optimizer.zero_grad()
+                if cfg.ema:
+                    ema.update(model)
 
             # logging
             cur_lr = optimizer.param_groups[0]['lr']
