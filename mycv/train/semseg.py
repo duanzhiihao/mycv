@@ -114,9 +114,9 @@ def train():
         print(f'Using device {_id}:', torch.cuda.get_device_properties(_id))
     device = torch.device(f'cuda:{cfg.device[0]}')
     bs_each = cfg.batch_size // len(cfg.device)
-    print('Batch size on each single GPU =', bs_each, '\n')
+    print('Batch size on each single GPU =', bs_each)
     print(f'Gradient accmulation: {cfg.accum_num} backwards() -> one step()')
-    print(f'Effective batch size: {cfg.accum_batch_size}')
+    print(f'Effective batch size: {cfg.accum_batch_size}', '\n')
 
     # Dataset
     print('Initializing Datasets and Dataloaders...')
@@ -218,8 +218,8 @@ def train():
             with amp.autocast(enabled=cfg.amp):
                 outputs, main_loss, aux_loss = model(imgs, labels)
                 loss = main_loss + cfg.aux_weight * aux_loss
-                loss = loss / cfg.accum_num
-                # loss is averaged within image, sumed over batch, and sumed over gpus
+                loss = loss / cfg.accum_num / len(cfg.device)
+                # loss is averaged within image, averaged over batch, and averaged over gpus
             # backward, update
             scaler.scale(loss).backward()
 
