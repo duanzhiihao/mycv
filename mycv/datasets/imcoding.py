@@ -141,7 +141,7 @@ def _imread(img_path):
     return input_, im
 
 
-def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, bar=False,
+def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, bar=True,
                  dataset='kodak'):
     """ Test on Kodak dataset
 
@@ -161,6 +161,9 @@ def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, bar=Fal
     elif dataset == 'clic':
         from mycv.paths import CLIC_DIR
         img_dir = CLIC_DIR / 'valid'
+    elif dataset == 'imagenet':
+        from mycv.paths import IMAGENET_DIR
+        img_dir = IMAGENET_DIR / 'val'
     else:
         img_dir = dataset
     img_names = os.listdir(img_dir)
@@ -169,9 +172,9 @@ def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, bar=Fal
 
     # traverse the dataset
     msssim_func = MS_SSIM(max_val=1.0)
-    psnr_all, msssim_all, bpp_all = [], [], []
+    psnr_sum, msssim_sum, bpp_sum = 0, 0, 0
     pbar = tqdm(img_paths) if bar else img_paths
-    for impath in pbar:
+    for bi, impath in enumerate(pbar):
         # load image
         input_, im = _imread(impath)
         imh, imw = im.shape[:2]
@@ -211,13 +214,20 @@ def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, bar=Fal
         #     plt.figure(); plt.imshow(im)
         #     plt.figure(); plt.imshow(fake); plt.show()
         # recording
-        msssim_all.append(ms)
-        psnr_all.append(ps)
-        bpp_all.append(bpp)
+        msssim_sum += ms
+        psnr_sum += ps
+        bpp_sum += bpp
+        if bar:
+            _num = bi + 1
+            msssim = msssim_sum / _num
+            psnr   = psnr_sum   / _num
+            bpp    = bpp_sum    / _num
+            msg = f'MS: {msssim:.4g}, PSNR: {psnr:.4g}, bpp: {bpp:.4g}'
+            pbar.set_description(msg)
     # average over all images
-    msssim = sum(msssim_all) / len(img_paths)
-    psnr   = sum(psnr_all)   / len(img_paths)
-    bpp    = sum(bpp_all)    / len(img_paths)
+    msssim = msssim_sum / len(img_paths)
+    psnr   = psnr_sum   / len(img_paths)
+    bpp    = bpp_sum    / len(img_paths)
     results = {
         'psnr': psnr,
         'msssim': msssim,
@@ -245,5 +255,5 @@ if __name__ == "__main__":
     model.load_state_dict(checkpoint['model'])
     model = model.cuda()
     model.eval()
-    results = kodak_val(model, input_norm=False)
+    results = nic_evaluate(model, input_norm=False)
     print(results)
