@@ -28,7 +28,7 @@ class ImageNetCls(torch.utils.data.Dataset):
     '''
     input_mean = torch.FloatTensor(RGB_MEAN).view(3, 1, 1)
     input_std  = torch.FloatTensor(RGB_STD).view(3, 1, 1)
-    def __init__(self, split='train', img_size=224, input_norm=True, color_aug=False):
+    def __init__(self, split='train', img_size=224, input_norm=True):
         assert IMAGENET_DIR.is_dir() and isinstance(img_size, int)
 
         ann_path = IMAGENET_DIR / f'annotations/{split}.txt'
@@ -50,6 +50,13 @@ class ImageNetCls(torch.utils.data.Dataset):
 
         self.split     = split
         self.img_size  = img_size
+        self.num_class = max(self._labels) + 1
+        self.transform = tvt.transforms.Compose([
+            tvt.transforms.RandomResizedCrop(img_size),
+            tvt.transforms.RandomHorizontalFlip(),
+            tvt.transforms.ToTensor()
+        ])
+        self._input_norm = input_norm
         # if color_aug:
         #     self.transform = tvt.Compose([
         #         tvt.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.6, hue=0.04),
@@ -57,12 +64,6 @@ class ImageNetCls(torch.utils.data.Dataset):
         #     ])
         # else:
         #     self.transform = tvt.ToTensor()
-        self.transform = tvt.transforms.Compose([
-            tvt.transforms.RandomResizedCrop(img_size),
-            tvt.transforms.RandomHorizontalFlip(),
-            tvt.transforms.ToTensor()
-        ])
-        self._input_norm = input_norm
 
     def __len__(self):
         assert len(self._img_paths) == len(self._labels)
@@ -130,29 +131,43 @@ def imagenet_val(model: torch.nn.Module, split='val', testloader=None,
             testset, batch_size=batch_size, shuffle=False, num_workers=workers,
             pin_memory=True, drop_last=False
         )
+    nC = testloader.dataset.num_class
 
+    predictions = []
+    top1_tpsum, top5_tpsum, _num = 0, 0, 0
     # traverse the dataset
-    predictions, labels_all = [], []
+    pbar = tqdm(testloader)
     with torch.no_grad():
-        for imgs, labels in tqdm(testloader):
+        for imgs, labels in pbar:
             # _debug(imgs)
+            nB = imgs.shape[0]
+            # forward pass
             imgs = imgs.to(device=device)
             p = forward_(imgs)
-            assert p.dim() == 2 and labels.max().item() < p.shape[1]
-            _, p = torch.max(p, dim=1)
-            predictions.append(p)
-            labels_all.append(labels)
+            assert p.shape == (nB, nC) and labels.shape == (nB,)
+            # reduce to top5
+            _, pred = torch.topk(p, k=5, dim=1, largest=True)
+            pred = pred.cpu()
+            # record for real labels
+            predictions.append(pred[:, 0])
+            # compute top5 match
+            correct = pred.eq(labels.view(nB, 1).expand_as(pred))
+            _top1 = correct[:, 0].sum().item()
+            _top5 = correct.any(dim=1).sum().item()
+            top1_tpsum += _top1
+            top5_tpsum += _top5
+            # verbose
+            _num += nB
+            msg = f'top1: {top1_tpsum/_num:.4g}, top5: {top5_tpsum/_num:.4g}'
+            pbar.set_description(msg)
 
     predictions = torch.cat(predictions, dim=0).cpu()
-    labels_all  = torch.cat(labels_all,  dim=0)
-    assert predictions.dim() == 1 and predictions.shape == labels_all.shape
-    assert predictions.dtype == labels_all.dtype == torch.int64
-    assert len(testloader.dataset) == len(labels_all)
+    total_num = len(testloader.dataset)
+    assert len(predictions) == total_num
 
     # compare the predictions and labels
-    tps = (predictions == labels_all)
-    assert tps.dtype == torch.bool
-    acc = tps.float().mean().item()
+    acc_top1 = top1_tpsum / total_num
+    acc_top5 = top5_tpsum / total_num
 
     # 'real' labels https://github.com/google-research/reassessed-imagenet
     if split == 'val':
@@ -163,9 +178,9 @@ def imagenet_val(model: torch.nn.Module, split='val', testloader=None,
         tps = [p.item() in t for p,t in zip(predictions,labels_real_all) if len(t) > 0]
         acc_real = sum(tps) / len(tps)
     else:
-        acc_real = acc
+        acc_real = acc_top1
 
-    results = {'top1': acc, 'top1_real': acc_real}
+    results = {'top1': acc_top1, 'top5': acc_top5, 'top1_real': acc_real}
     return results
 
 def _debug(imgs):    
