@@ -33,7 +33,7 @@ def train():
     parser = argparse.ArgumentParser()
     parser.add_argument('--project',    type=str,  default='imagenet')
     parser.add_argument('--group',      type=str,  default='default')
-    parser.add_argument('--model',      type=str,  default='res50')
+    parser.add_argument('--model',      type=str,  default='efb0')
     parser.add_argument('--resume',     type=str,  default='')
     parser.add_argument('--batch_size', type=int,  default=256)
     parser.add_argument('--accum_bs',   type=int,  default=None)
@@ -42,7 +42,7 @@ def train():
     parser.add_argument('--epochs',     type=int,  default=90)
     parser.add_argument('--study',      type=bool, default=False)
     parser.add_argument('--device',     type=int,  default=[0], nargs='+')
-    parser.add_argument('--workers',    type=int,  default=6)
+    parser.add_argument('--workers',    type=int,  default=8)
     parser.add_argument('--wbmode',     type=str,  default='disabled')
     cfg = parser.parse_args()
     # model
@@ -177,7 +177,7 @@ def train():
     if len(cfg.device) > 1:
         model = torch.nn.DataParallel(model, device_ids=cfg.device)
 
-    glog = gradient_logger(model, save_dir=log_dir)
+    glog = gradient_logger(model, save_dir=log_dir) if cfg.study else None
 
     # ======================== start training ========================
     pbar_title = ('%-10s' * 7) % (
@@ -302,6 +302,9 @@ def get_model(name, num_class):
         from mycv.models.yolov5.cls import CSP
         assert name[-1] in ['s', 'm', 'l']
         model = CSP(model=name[-1], num_class=num_class)
+    elif name == 'efb0':
+        from mycv.external.efficientnet.model import EfficientNet
+        model = EfficientNet.from_name('efficientnet-b0')
     else:
         raise ValueError()
     return model
