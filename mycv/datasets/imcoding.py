@@ -141,8 +141,7 @@ def _imread(img_path):
     return input_, im
 
 
-def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, bar=True,
-                 dataset='kodak'):
+def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, dataset='kodak'):
     """ Test on Kodak dataset
 
     Args:
@@ -173,7 +172,7 @@ def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, bar=Tru
     # traverse the dataset
     msssim_func = MS_SSIM(max_val=1.0)
     psnr_sum, msssim_sum, bpp_sum = 0, 0, 0
-    pbar = tqdm(img_paths) if bar else img_paths
+    pbar = tqdm(img_paths) if verbose else img_paths
     for bi, impath in enumerate(pbar):
         # load image
         input_, im = _imread(impath)
@@ -217,7 +216,7 @@ def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, bar=Tru
         msssim_sum += ms
         psnr_sum += ps
         bpp_sum += bpp
-        if bar:
+        if verbose:
             _num = bi + 1
             msssim = msssim_sum / _num
             psnr   = psnr_sum   / _num
