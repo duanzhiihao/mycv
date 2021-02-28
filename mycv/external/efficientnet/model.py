@@ -416,18 +416,30 @@ class EfficientNet(nn.Module):
 
 
 if __name__ == '__main__':
+    from tqdm import tqdm
+    from fvcore.nn import flop_count
     from mycv.paths import MYCV_DIR
     from mycv.datasets.imagenet import imagenet_val
+
     model = EfficientNet.from_name('efficientnet-b0')
-    model = model.cuda()
     model.eval()
-    weights = torch.load(MYCV_DIR / 'weights/efficientnet/b0-355c32eb.pth')
-    model.load_state_dict(weights)
 
-    results = imagenet_val(model, img_size=224, batch_size=64, workers=4, input_norm=True)
-    print(results)
+    # input = torch.randn(1, 3, 224, 224)
+    # final_count, skipped_ops = flop_count(model, (input, )) 
+    # print(final_count)
+    # exit()
 
-    # with torch.no_grad():
-    #     x = torch.randn(1, 3, 224, 224).cuda()
-    #     y = model(x)
+    # model = model.cuda()
+    # weights = torch.load(MYCV_DIR / 'weights/efficientnet/b0-355c32eb.pth')
+    # model.load_state_dict(weights)
+    # results = imagenet_val(model, img_size=224, batch_size=64, workers=4, input_norm=True)
+    # print(results)
+
+    # model = model.cuda()
+    model.eval()
+    for _ in tqdm(range(4096)):
+        x = torch.randn(1, 3, 224, 224)
+        # x = torch.randn(1, 3, 224, 224, device='cuda:0')
+        y = model(x)
+    exit()
     debug = 1

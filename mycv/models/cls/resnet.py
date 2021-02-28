@@ -107,7 +107,7 @@ class ResNet(nn.Module):
             layers.append(block(self.inplanes, planes))
         return nn.Sequential(*layers)
 
-    def forward(self, x):
+    def forward(self, x, _return_cache=False):
         # x: [b, 3, H, W]
         x = self.conv1(x) # x: [b, 64, H/2, W/2]
         x = self.bn1(x)
@@ -126,6 +126,8 @@ class ResNet(nn.Module):
         x = self.fc(x) 
         self.cache = [x1, x2, x3, x4]
         # x: [b, num_class]
+        if _return_cache:
+            return x, x1, x2, x3, x4
         return x
 
 
@@ -168,14 +170,18 @@ def resnet152(num_classes):
 if __name__ == '__main__':
     from tqdm import tqdm
     from thop import profile, clever_format
+    from fvcore.nn import flop_count
+
     model = resnet50(1000)
     input = torch.randn(1, 3, 224, 224)
-    macs, params = profile(model, inputs=(input, ))
-    macs, params = clever_format([macs, params], "%.3f")
-    print(macs, params)
+    # macs, params = profile(model, inputs=(input, ))
+    # macs, params = clever_format([macs, params], "%.3f")
+    # print(macs, params)
+    final_count, skipped_ops = flop_count(model, (input, )) 
+    print(final_count)
 
-    model = model.cuda()
-    model.eval()
-    for _ in tqdm(range(4096)):
-        x = torch.randn(1, 3, 224, 224, device='cuda:0')
-        y = model(x)
+    # model = model.cuda()
+    # model.eval()
+    # for _ in tqdm(range(4096)):
+    #     x = torch.randn(1, 3, 224, 224, device='cuda:0')
+    #     y = model(x)
