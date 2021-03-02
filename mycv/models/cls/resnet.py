@@ -173,15 +173,17 @@ if __name__ == '__main__':
     from fvcore.nn import flop_count
 
     model = resnet50(1000)
-    input = torch.randn(1, 3, 224, 224)
+    # input = torch.randn(1, 3, 224, 224)
     # macs, params = profile(model, inputs=(input, ))
     # macs, params = clever_format([macs, params], "%.3f")
     # print(macs, params)
-    final_count, skipped_ops = flop_count(model, (input, )) 
-    print(final_count)
+    # final_count, skipped_ops = flop_count(model, (input, )) 
+    # print(final_count)
 
     # model = model.cuda()
-    # model.eval()
-    # for _ in tqdm(range(4096)):
-    #     x = torch.randn(1, 3, 224, 224, device='cuda:0')
-    #     y = model(x)
+    model.eval()
+    with torch.no_grad():
+        for _ in tqdm(range(10000)):
+            # x = torch.randn(1, 3, 224, 224, device='cuda:0')
+            x = torch.randn(1, 3, 224, 224)
+            y = model(x)

@@ -65,7 +65,7 @@ def resize_large_imgs(max_size=1024):
 
 
 if __name__ == '__main__':
-    # fix_jpeg()
-    # remove_exif('train')
-    # remove_exif('val')
-    resize_large_imgs()
+    fix_jpeg()
+    remove_exif('train')
+    remove_exif('val')
+    # resize_large_imgs()

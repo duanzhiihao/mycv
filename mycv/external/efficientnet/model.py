@@ -437,9 +437,10 @@ if __name__ == '__main__':
 
     # model = model.cuda()
     model.eval()
-    for _ in tqdm(range(4096)):
-        x = torch.randn(1, 3, 224, 224)
-        # x = torch.randn(1, 3, 224, 224, device='cuda:0')
-        y = model(x)
+    with torch.no_grad():
+        for _ in tqdm(range(4096)):
+            x = torch.randn(1, 3, 224, 224)
+            # x = torch.randn(1, 3, 224, 224, device='cuda:0')
+            y = model(x)
     exit()
     debug = 1

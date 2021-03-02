@@ -61,6 +61,8 @@ def load_partial(model, weights, verbose=True):
         else:
             debug = 1
     model.load_state_dict(new_dic, strict=False)
+    def _num(dic_):
+        return sum([p.numel() for k,p in dic_.items()])
     if verbose:
         print(f'{type(model).__name__}: {len(self_state)} layers,',
               f'saved: {len(external_state)} layers,',

@@ -202,6 +202,7 @@ def train():
             # forward
             with amp.autocast(enabled=cfg.amp):
                 p = model(imgs)
+                assert p.shape == (nB, cfg.num_class)
                 loss = loss_func(p, labels) #* nB
                 loss = loss / cfg.accum_num / len(cfg.device)
                 # loss is averaged over batch, and averaged over gpus
@@ -304,7 +305,7 @@ def get_model(name, num_class):
         model = CSP(model=name[-1], num_class=num_class)
     elif name == 'efb0':
         from mycv.external.efficientnet.model import EfficientNet
-        model = EfficientNet.from_name('efficientnet-b0')
+        model = EfficientNet.from_name('efficientnet-b0', num_class=num_class)
     else:
         raise ValueError()
     return model
