@@ -69,6 +69,14 @@ def load_partial(model, weights, verbose=True):
               f'overlap & loaded: {len(new_dic)} layers')
 
 
+def load_partial_optimizer(optimizer, state, verbose=True):
+    raise NotImplementedError()
+    groups = self.param_groups
+    saved_groups = state_dict['param_groups']
+    # idmap = 
+    debug = 1
+
+
 def rename_weights(weights, old, new, verbose=True):
     """ replace old with new
 

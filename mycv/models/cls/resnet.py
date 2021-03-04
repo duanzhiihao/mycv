@@ -171,8 +171,19 @@ if __name__ == '__main__':
     from tqdm import tqdm
     from thop import profile, clever_format
     from fvcore.nn import flop_count
+    from mycv.paths import MYCV_DIR
+    from mycv.datasets.imagenet import imagenet_val
 
     model = resnet50(1000)
+    model = model.cuda()
+    model.eval()
+
+    checkpoint = torch.load(MYCV_DIR / 'weights/res50_normfalse.pt')
+    model.load_state_dict(checkpoint['model'])
+    results = imagenet_val(model, split='val',
+                img_size=224, batch_size=64, workers=4, input_norm=False)
+    print(results)
+
     # input = torch.randn(1, 3, 224, 224)
     # macs, params = profile(model, inputs=(input, ))
     # macs, params = clever_format([macs, params], "%.3f")
@@ -181,9 +192,9 @@ if __name__ == '__main__':
     # print(final_count)
 
     # model = model.cuda()
-    model.eval()
-    with torch.no_grad():
-        for _ in tqdm(range(10000)):
-            # x = torch.randn(1, 3, 224, 224, device='cuda:0')
-            x = torch.randn(1, 3, 224, 224)
-            y = model(x)
+    # model.eval()
+    # with torch.no_grad():
+    #     for _ in tqdm(range(10000)):
+    #         # x = torch.randn(1, 3, 224, 224, device='cuda:0')
+    #         x = torch.randn(1, 3, 224, 224)
+    #         y = model(x)
