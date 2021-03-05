@@ -122,13 +122,15 @@ def pad_divisible(im: np.ndarray, div: int):
 
 def crop_divisible(im: np.ndarray, div: int):
     '''
-    Crop the bottom and right border such that the image [h,w] are multiple of div
+    Crop sides and remain the center part such that the image [h,w] are multiple of div
     '''
     assert len(im.shape) == 3 and isinstance(div, int)
     h_old, w_old, ch = im.shape
-    h_crop = div * (h_old // div)
-    w_crop = div * (w_old // div)
-    cropped = im[:h_crop, :w_crop, :]
+    h_new = div * (h_old // div)
+    w_new = div * (w_old // div)
+    top = (h_old - h_new) // 2
+    left = (w_old - w_new) // 2
+    cropped = im[top:top+h_new, left:left+w_new, :]
     return cropped
 
 
