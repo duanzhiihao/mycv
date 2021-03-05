@@ -272,7 +272,7 @@ class EfficientNet(nn.Module):
 
         return endpoints
 
-    def extract_features(self, inputs):
+    def extract_features(self, inputs, _return_cache=False):
         """use convolution layer to extract feature .
 
         Args:
@@ -284,17 +284,23 @@ class EfficientNet(nn.Module):
         """
         # Stem
         x = self._swish(self._bn0(self._conv_stem(inputs)))
+        prev_x = x
 
         # Blocks
+        endpoints = []
         for idx, block in enumerate(self._blocks):
             drop_connect_rate = self._global_params.drop_connect_rate
             if drop_connect_rate:
                 drop_connect_rate *= float(idx) / len(self._blocks) # scale drop connect_rate
             x = block(x, drop_connect_rate=drop_connect_rate)
+            if prev_x.size(2) > x.size(2):
+                endpoints.append(prev_x)
+            prev_x = x
 
         # Head
         x = self._swish(self._bn1(self._conv_head(x)))
 
+        self.cache = endpoints
         return x
 
     def forward(self, inputs):
