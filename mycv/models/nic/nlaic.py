@@ -229,8 +229,9 @@ class Dec(nn.Module):
 
 if __name__ == "__main__":
     from mycv.paths import MYCV_DIR
-    from mycv.utils.torch_utils import load_partial
+    from mycv.utils.torch_utils import load_partial, num_params
     model = NLAIC(enable_bpp=True)
+    print(num_params(model))
     # load_partial(model, MYCV_DIR / 'weights/nlaic/msssim4.pkl')
     # load_partial(model.context, MYCV_DIR / 'weights/nlaic/msssim4p.pkl')
     # torch.save(model.state_dict(), MYCV_DIR / 'weights/nlaic/nlaic_ms4_2.pt')
