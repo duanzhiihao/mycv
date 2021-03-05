@@ -30,9 +30,11 @@ class ImageNetCls(torch.utils.data.Dataset):
     def __init__(self, split='train', img_size=224, input_norm=True):
         assert IMAGENET_DIR.is_dir() and isinstance(img_size, int)
 
-        ann_path = IMAGENET_DIR / f'annotations/{split}.txt'
         if split == 'val':
             img_dir = IMAGENET_DIR / 'val'
+        elif split.startswith('train_') or split.startswith('val_'):
+            img_dir = IMAGENET_DIR / split
+            split = split.split('_')[0]
         else:
             img_dir = IMAGENET_DIR / 'train'
 
@@ -71,7 +73,7 @@ class ImageNetCls(torch.utils.data.Dataset):
         img = Image.open(impath).convert('RGB')
         # label
         label = self._labels[index]
-        if self.split == 'train': # sanity check
+        if self.split.startswith('train'): # sanity check
             wnid = Path(impath).parts[-2]
             assert label == self.WNID_TO_IDX[wnid]
 

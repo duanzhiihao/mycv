@@ -33,12 +33,14 @@ def train():
     parser = argparse.ArgumentParser()
     parser.add_argument('--project',    type=str,  default='imagenet')
     parser.add_argument('--group',      type=str,  default='default')
-    parser.add_argument('--model',      type=str,  default='efb0')
+    parser.add_argument('--model',      type=str,  default='res50')
     parser.add_argument('--resume',     type=str,  default='')
+    parser.add_argument('--load',       type=str,  default='')
     parser.add_argument('--batch_size', type=int,  default=256)
     parser.add_argument('--accum_bs',   type=int,  default=None)
+    parser.add_argument('--lr',         type=float,default=0.1)
     parser.add_argument('--amp',        type=bool, default=True)
-    parser.add_argument('--ema',        type=bool, default=True)
+    parser.add_argument('--ema',        type=bool, default=False)
     parser.add_argument('--epochs',     type=int,  default=90)
     parser.add_argument('--study',      type=bool, default=False)
     parser.add_argument('--device',     type=int,  default=[0], nargs='+')
@@ -49,7 +51,6 @@ def train():
     cfg.img_size = 224
     cfg.input_norm = False
     # optimizer
-    cfg.lr = 0.1
     cfg.momentum = 0.9
     cfg.weight_decay = 0.0001
     cfg.nesterov = False
@@ -80,23 +81,26 @@ def train():
     if cfg.group == 'default':
         train_split = 'train'
         val_split = 'val'
-        cfg.num_class = 1000
     elif cfg.group == 'mini200':
         train_split = 'train200_600'
         val_split = 'val200_600'
-        cfg.num_class = 200
     else:
-        raise ValueError()
+        train_split = f'train_{cfg.group}'
+        val_split = f'val_{cfg.group}'
     # training set
     trainset = ImageNetCls(train_split, img_size=cfg.img_size, input_norm=cfg.input_norm)
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=cfg.batch_size,
                     shuffle=True, num_workers=cfg.workers, pin_memory=True)
+    cfg.num_class = trainset.num_class
     # test set
     testloader = torch.utils.data.DataLoader(
         ImageNetCls(split=val_split, img_size=cfg.img_size, input_norm=cfg.input_norm),
         batch_size=bs_each//2, shuffle=False, num_workers=cfg.workers//2,
         pin_memory=True, drop_last=False
     )
+    print(f'Training on {train_split}, val on {val_split}, {cfg.num_class} classes', '\n')
+    print(f'First training image path: {trainset._img_paths[0]}')
+    print(f'First val image path: {testloader.dataset._img_paths[0]}', '\n')
 
     # Initialize model
     model = get_model(cfg.model, cfg.num_class)
@@ -148,6 +152,13 @@ def train():
         print(str(model), file=open(log_dir / 'model.txt', 'w'))
         start_epoch = 0
         best_fitness = 0
+
+        if cfg.load:
+            checkpoint = torch.load(log_parent / cfg.load / 'best.pt')
+            model.load_state_dict(checkpoint['model'])
+            optimizer.load_state_dict(checkpoint['optimizer'])
+            scaler.load_state_dict(checkpoint['scaler'])
+
     start_iter = start_epoch * len(trainloader)
 
     # initialize wandb
@@ -308,6 +319,7 @@ def get_model(name, num_class):
         model = EfficientNet.from_name('efficientnet-b0', num_class=num_class)
     else:
         raise ValueError()
+    print(f'Using model {type(model)}, {num_class} classes', '\n')
     return model
 
 
