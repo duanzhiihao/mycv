@@ -45,7 +45,7 @@ class myCOCOeval(cocoeval.COCOeval):
         self._paramsEval = {}               # parameters for evaluation
         self.stats = []                     # result summarization
         self.ious = {}                      # ious between all gts and dts
-        
+
         self.params.imgIds = sorted([im['id'] for im in self.gt_json['images']])
         self.params.catIds = sorted([c['id'] for c in self.gt_json['categories']])
 
@@ -53,7 +53,7 @@ class myCOCOeval(cocoeval.COCOeval):
         for i, dt in enumerate(self.dt_json):
             dt['id'] = dt.get('id', i+1)
             dt['area'] = dt.get('area', dt['bbox'][2]*dt['bbox'][3])
-        
+
     def _prepare(self):
         '''
         Prepare ._gts and ._dts for evaluation based on params
@@ -96,7 +96,7 @@ class myCOCOeval(cocoeval.COCOeval):
             self._dts[dt['image_id'], dt['category_id']].append(dt)
         self.evalImgs = defaultdict(list)   # per-image per-category evaluation results
         self.eval     = {}                  # accumulated evaluation results
-    
+
     def evaluate(self):
         '''
         Run per image evaluation on given images and store results (a list of dict) in self.evalImgs
