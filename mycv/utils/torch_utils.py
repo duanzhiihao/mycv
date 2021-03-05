@@ -140,6 +140,19 @@ def adjust_lr_threestep(optimizer, cur_epoch, base_lr, total_epoch):
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
+def _adjust_lr_532(optimizer, cur_epoch, base_lr, total_epoch):
+    assert total_epoch % 10 == 0
+    if cur_epoch < round(total_epoch * 5/10):
+        lrf = 1
+    elif cur_epoch < round(total_epoch * 8/10):
+        lrf = 0.1
+    else:
+        assert cur_epoch < total_epoch
+        lrf = 0.01
+    lr = base_lr * lrf
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
 
 def fuse_conv_and_bn(conv, bn):
     # Fuse convolution and batchnorm layers https://tehnokv.com/posts/fusing-batchnorm-and-conv/
