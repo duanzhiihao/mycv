@@ -9,7 +9,7 @@ import torchvision.transforms.functional as tvf
 import mycv.utils.aug as augUtils
 from mycv.paths import IMAGENET_DIR
 
-def get_classes():
+def _get_classes():
     fpath = IMAGENET_DIR / 'annotations/classes.txt'
     with open(fpath, 'r') as f:
         wnids = f.read().strip().split('\n')
@@ -17,15 +17,14 @@ def get_classes():
     wnid_to_idx = {s:i for i,s in enumerate(wnids)}
     return wnids, wnid_to_idx
 
-WNIDS, WNID_TO_IDX = get_classes()
-RGB_MEAN = (0.485, 0.456, 0.406)
-RGB_STD  = (0.229, 0.224, 0.225)
-
 
 class ImageNetCls(torch.utils.data.Dataset):
     '''
     ImageNet Classification dataset
     '''
+    WNIDS, WNID_TO_IDX = _get_classes()
+    RGB_MEAN = (0.485, 0.456, 0.406)
+    RGB_STD  = (0.229, 0.224, 0.225)
     input_mean = torch.FloatTensor(RGB_MEAN).view(3, 1, 1)
     input_std  = torch.FloatTensor(RGB_STD).view(3, 1, 1)
     def __init__(self, split='train', img_size=224, input_norm=True):
@@ -36,17 +35,14 @@ class ImageNetCls(torch.utils.data.Dataset):
             img_dir = IMAGENET_DIR / 'val'
         else:
             img_dir = IMAGENET_DIR / 'train'
-        assert ann_path.is_file(), f'Error: {ann_path} does not exist.'
-        with open(ann_path, 'r') as f:
-            lines = f.read().strip().split('\n')
 
         self._img_paths = []
         self._labels = []
-        for l in lines:
-            imname, label = l.split()
+        pairs = self.get_image_label_pairs(split)
+        for imname, label in pairs:
             self._img_paths.append(str(img_dir / imname))
             # self._img_paths.append(str(img_dir / lines[0].split()[0])) # debugging
-            self._labels.append(int(label))
+            self._labels.append(label)
 
         self.split     = split
         self.img_size  = img_size
@@ -77,7 +73,7 @@ class ImageNetCls(torch.utils.data.Dataset):
         label = self._labels[index]
         if self.split == 'train': # sanity check
             wnid = Path(impath).parts[-2]
-            assert label == WNID_TO_IDX[wnid]
+            assert label == self.WNID_TO_IDX[wnid]
 
         img_size = self.img_size
         if self.split.startswith('train'):
@@ -102,6 +98,18 @@ class ImageNetCls(torch.utils.data.Dataset):
             im = im.sub_(self.input_mean).div_(self.input_std)
 
         return im, label
+
+    @staticmethod
+    def get_image_label_pairs(split):
+        ann_path = IMAGENET_DIR / f'annotations/{split}.txt'
+        assert ann_path.is_file(), f'Error: {ann_path} does not exist.'
+        with open(ann_path, 'r') as f:
+            lines = f.read().strip().split('\n')
+        pairs = []
+        for s in lines:
+            imname, label = s.split()
+            pairs.append((imname, int(label)))
+        return pairs
 
 
 def imagenet_val(model: torch.nn.Module, split='val', testloader=None,
