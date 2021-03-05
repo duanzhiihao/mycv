@@ -94,20 +94,22 @@ class PSPNet(nn.Module):
             assert (x.shape[2]-1) % 8 == 0 and (x.shape[3]-1) % 8 == 0
         else:
             assert x.shape[2] % 8 == 0 and x.shape[3] % 8 == 0
-        h, w = x.shape[2:4]
+        h, w = x.shape[2:4] # (nB, 3, h, w)
 
-        x = self.layer0(x)
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x_tmp = self.layer3(x)
-        x = self.layer4(x_tmp)
-        x = self.ppm(x)
-        x = self.cls(x)
+        x = self.layer0(x) # (nB, 128, h/4, w/4)
+        x1 = self.layer1(x) # (nB, 256, h/4, w/4)
+        x2 = self.layer2(x1) # (nB, 512, h/8, w/8)
+        x3 = self.layer3(x2) # (nB, 1024, h/8, w/8)
+        x4 = self.layer4(x3) # (nB, 2048, h/8, w/8)
+        x5 = self.ppm(x4) # (nB, 4096, h/8, w/8)
+        x = self.cls(x5) # (nB, 19, h/8, w/8)
         x = tnf.interpolate(x, size=(h, w), mode='bilinear', align_corners=True)
+        # (nB, 19, h, w)
+        self.cache = [x1, x2, x3, x4, x5]
 
         if self.training:
             assert y is not None
-            aux = self.aux(x_tmp)
+            aux = self.aux(x3)
             aux = tnf.interpolate(aux, size=(h, w), mode='bilinear', align_corners=True)
             main_loss = self.criterion(x, y)
             aux_loss = self.criterion(aux, y)
@@ -120,8 +122,9 @@ if __name__ == '__main__':
     model = PSPNet()
     model = model.cuda()
 
-    # x = torch.rand(4, 3, 713, 713).cuda()
-    # p = model(x)
+    x = torch.rand(4, 3, 640, 640).cuda()
+    with torch.no_grad():
+        p = model(x)
 
     from mycv.paths import MYCV_DIR
     from mycv.datasets.cityscapes import evaluate_semseg
