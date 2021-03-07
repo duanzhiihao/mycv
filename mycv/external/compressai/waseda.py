@@ -58,14 +58,15 @@ class Cheng2020Anchor(nn.Module):
 
     def forward(self, x):
         y = self.g_a(x)
-
-        y_hat = self.gaussian_conditional.quantize(
-            y, "noise" if self.training else "dequantize"
-        )
+        if self.training:
+            raise NotImplementedError()
+        else:
+            y_hat = torch.round(y)
         x_hat = self.g_s(y_hat)
 
         if not self.enable_bpp:
             return x_hat, None
+        raise NotImplementedError()
         # z = self.h_a(y)
         # z_hat, z_likelihoods = self.entropy_bottleneck(z)
         # params = self.h_s(z_hat)
