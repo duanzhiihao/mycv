@@ -148,6 +148,7 @@ def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, dataset
         print(f'Evaluating {type(model)} on {dataset} dataset...')
     model.eval()
     device = next(model.parameters()).device
+    forward_nic = getattr(model, 'forward_nic', model.forward)
 
     if dataset == 'kodak':
         # kodak dataset
@@ -185,8 +186,13 @@ def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, dataset
         # forward pass
         input_ = input_.unsqueeze(0).to(device=device)
         with torch.no_grad():
-            fake, probs = model.forward_nic(input_)
+            output = forward_nic(input_)
+            if isinstance(output, dict):
+                fake, probs = output['x_hat'], output['likelihoods']
+            else:
+                fake, probs = output
         fake: torch.Tensor # should be between 0~1
+        fake = fake.clamp_(min=0, max=1)
         assert fake.shape == input_.shape and fake.dtype == input_.dtype
 
         # MS-SSIM
@@ -199,7 +205,10 @@ def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, dataset
         ps = psnr_dB(im, fake)
         # Bpp
         if probs is not None:
-            p1, p2 = probs
+            if isinstance(probs, dict):
+                p1, p2 = probs['y'], probs['z']
+            else:
+                p1, p2 = probs
             bpp = cal_bpp(p1, imh*imw) + cal_bpp(p2, imh*imw)
             bpp = bpp.item()
         else:
