@@ -73,7 +73,7 @@ class ImageNetCls(torch.utils.data.Dataset):
         img = Image.open(impath).convert('RGB')
         # label
         label = self._labels[index]
-        if self.split.startswith('train'): # sanity check
+        if self.split == 'train': # sanity check
             wnid = Path(impath).parts[-2]
             assert label == self.WNID_TO_IDX[wnid]
 

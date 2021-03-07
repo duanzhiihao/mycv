@@ -4,15 +4,11 @@ import json
 from math import log10
 import cv2
 import torch
-import torchvision
-import numpy as np
-from PIL import Image
-import torchvision.transforms.functional as tvf
 
 import mycv.utils.image as imgUtils
 import mycv.utils.aug as augUtils
 from mycv.utils.coding import psnr_dB, MS_SSIM, cal_bpp
-from mycv.datasets.imagenet import RGB_MEAN, RGB_STD
+from mycv.datasets.imagenet import ImageNetCls
 
 
 def _get_imgpaths(datasets: list, verbose=True):
@@ -87,8 +83,8 @@ class LoadImages(torch.utils.data.Dataset):
         self.img_paths = _get_imgpaths(datasets, verbose)
         self.img_size  = img_size
         self._input_norm = input_norm
-        self._input_mean = torch.FloatTensor(RGB_MEAN).view(3, 1, 1)
-        self._input_std  = torch.FloatTensor(RGB_STD).view(3, 1, 1)
+        self._input_mean = ImageNetCls.input_mean
+        self._input_std  = ImageNetCls.input_std
 
     def __len__(self):
         return len(self.img_paths)
@@ -112,7 +108,7 @@ class LoadImages(torch.utils.data.Dataset):
         im = torch.from_numpy(im).permute(2, 0, 1).float() / 255.0
         if self._input_norm:
             # normalize such that mean = 0 and std = 1
-            im = (im - self._input_mean) / self._input_std
+            im = im.sub_(ImageNetCls.input_mean).div_(ImageNetCls.input_std)
 
         assert im.shape == (3, self.img_size, self.img_size)
         return im
