@@ -20,7 +20,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 # pylint: disable=E0611,E0401
-from compressai.ans import BufferedRansEncoder, RansDecoder
+# from compressai.ans import BufferedRansEncoder, RansDecoder
 from compressai.entropy_models import EntropyBottleneck, GaussianConditional
 from compressai.layers import GDN, MaskedConv2d
 
