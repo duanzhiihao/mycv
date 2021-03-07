@@ -97,7 +97,7 @@ class ImageNetCls(torch.utils.data.Dataset):
 
         # normalize such that mean = 0 and std = 1
         if self._input_norm:
-            im = im.sub_(self.input_mean).div_(self.input_std)
+            im = im.sub_(ImageNetCls.input_mean).div_(ImageNetCls.input_std)
 
         return im, label
 

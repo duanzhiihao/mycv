@@ -4,8 +4,8 @@ import cv2
 import torch
 import torch.cuda.amp as amp
 
-from mycv.datasets.imagenet import RGB_MEAN, RGB_STD
 from mycv.paths import CITYSCAPES_DIR
+from mycv.datasets.imagenet import ImageNetCls
 from mycv.external.semseg import transform
 
 # Copied from torchvision and https://github.com/mcordts/cityscapesScripts
@@ -62,8 +62,6 @@ def label_to_train_id_mapping():
     return mapping
 
 class Cityscapes(torch.utils.data.Dataset):
-    input_mean = torch.FloatTensor(RGB_MEAN).view(3, 1, 1)
-    input_std  = torch.FloatTensor(RGB_STD).view(3, 1, 1)
     num_class = 19
     mapping = label_to_train_id_mapping()
     ignore_label = 255
@@ -77,7 +75,7 @@ class Cityscapes(torch.utils.data.Dataset):
 
         # data augmentation setting
         if 'train' in split:
-            _mean = [v*255 for v in RGB_MEAN]
+            _mean = [v*255 for v in ImageNetCls.RGB_MEAN]
             self.transform = transform.Compose([
                 transform.RandScale([0.5, 2.0]),
                 transform.RandRotate([-10, 10], padding=_mean, ignore_label=0),
@@ -87,7 +85,7 @@ class Cityscapes(torch.utils.data.Dataset):
             ])
         else:
             self.transform = None
-        self.input_norm = input_norm
+        self._input_norm = input_norm
 
     def __len__(self):
         return len(self.img_gt_paths)
@@ -107,8 +105,8 @@ class Cityscapes(torch.utils.data.Dataset):
             im, label = self.transform(im, label)
         # image: np to tensor, normalization
         im = torch.from_numpy(im).permute(2, 0, 1).float() / 255.0
-        if self.input_norm:
-            im = (im - self.input_mean) / self.input_std
+        if self._input_norm:
+            im = im.sub_(ImageNetCls.input_mean).div_(ImageNetCls.input_std)
         # label: np to tensor, map the label id to training id
         # label[label == 255] = 0
         label = torch.from_numpy(label).to(dtype=torch.int64)
