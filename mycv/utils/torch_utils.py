@@ -78,6 +78,13 @@ def load_partial_optimizer(optimizer, state, verbose=True):
 
 
 def rename_weights(weights, old, new, verbose=True):
+    print('=======================================================================')
+    print('Warning: rename_weights() is Deprecated. Use weights_replace() instead.')
+    print('=======================================================================')
+    return weights_replace(weights, old, new, verbose)
+
+
+def weights_replace(weights, old, new, verbose=True):
     """ replace old with new
 
     Args:
@@ -101,6 +108,31 @@ def rename_weights(weights, old, new, verbose=True):
         new_dic[k] = v
     if verbose:
         print(f"Total {len(weights)}, renamed {count} '{old}' to '{new}'")
+    return new_dic
+
+
+def weights_rename(weights, new_list, verbose=True):
+    """ rename the weights given a list of new names
+
+    Args:
+        weights (path or dict): weights
+        new_list (list or keys): a list of new names
+        verbose (bool, optional): print if True. Defaults to True.
+    """
+    if isinstance(weights, (str, Path)):
+        if verbose:
+            print(f'Loading weights from {weights}...')
+        weights = torch.load(weights)
+    if 'model' in weights:
+        weights = weights['model']
+    assert isinstance(weights, OrderedDict), 'weights need to be an OrderedDict'
+    weights: OrderedDict
+    new_list = list(new_list)
+    assert len(weights.keys()) == len(new_list)
+
+    new_dic = OrderedDict()
+    for (_,v), k in zip(weights.items(), new_list):
+        new_dic[k] = v
     return new_dic
 
 
