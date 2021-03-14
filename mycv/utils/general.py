@@ -39,6 +39,12 @@ def disable_multithreads():
     cv2.ocl.setUseOpenCL(False)
 
 
+def warning(msg: str):
+    print('=======================================================================')
+    print('Warning:', msg)
+    print('=======================================================================')
+
+
 # def wb_increment_id(dir_root='wandb/', name='exp'):
 #     """ Increament wandb run name. E.g., xxx-exp1, yyy-exp2, zzz-exp3, ...
 #     """
