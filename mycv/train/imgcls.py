@@ -14,7 +14,8 @@ import torch.cuda.amp as amp
 # from torch.optim.lr_scheduler import LambdaLR
 
 from mycv.utils.general import increment_dir
-from mycv.utils.torch_utils import set_random_seeds, ModelEMA, adjust_lr_threestep, is_parallel
+from mycv.utils.torch_utils import set_random_seeds, ModelEMA, is_parallel
+from mycv.utils.lr_schedulers import adjust_lr_threestep
 from mycv.utils.image import save_tensor_images
 from mycv.datasets.imagenet import ImageNetCls, imagenet_val
 
@@ -40,9 +41,10 @@ def train():
     parser.add_argument('--accum_bs',   type=int,  default=None)
     parser.add_argument('--lr',         type=float,default=0.1)
     parser.add_argument('--amp',        type=bool, default=True)
-    parser.add_argument('--ema',        type=bool, default=False)
+    parser.add_argument('--ema',        type=bool, default=True)
     parser.add_argument('--epochs',     type=int,  default=90)
     parser.add_argument('--study',      type=bool, default=False)
+    parser.add_argument('--chlast',     action='store_true')
     parser.add_argument('--device',     type=int,  default=[0], nargs='+')
     parser.add_argument('--workers',    type=int,  default=8)
     parser.add_argument('--wbmode',     type=str,  default='disabled')
@@ -60,11 +62,11 @@ def train():
     cfg.ema_warmup_epochs = 4
 
     # check arguments
-    metric: str = 'top1_real'
+    metric: str = 'top1'
     epochs: int = cfg.epochs
     print(cfg, '\n')
     # fix random seeds for reproducibility
-    set_random_seeds(1)
+    # set_random_seeds(1)
     torch.backends.cudnn.benchmark = True
     # device setting
     assert torch.cuda.is_available()
@@ -105,6 +107,11 @@ def train():
     # Initialize model
     model = get_model(cfg.model, cfg.num_class)
     model = model.to(device)
+
+    if cfg.chlast:
+        assert torch.backends.cudnn.version() >= 7603
+        print('Using channel last memory layout...')
+        model = model.to(memory_format=torch.channels_last)
 
     # loss function
     loss_func = torch.nn.CrossEntropyLoss(reduction='mean')
@@ -196,6 +203,9 @@ def train():
     )
     niter = s = None
     for epoch in range(start_epoch, epochs):
+        if cfg.chlast:
+            model = model.to(memory_format=torch.channels_last)
+
         adjust_lr_threestep(optimizer, epoch, cfg.lr, total_epoch=epochs)
         model.train()
 
@@ -209,6 +219,9 @@ def train():
             imgs = imgs.to(device=device)
             labels = labels.to(device=device)
             nB, nC, nH, nW = imgs.shape
+
+            if cfg.chlast:
+                imgs = imgs.contiguous(memory_format=torch.channels_last)
 
             # forward
             with amp.autocast(enabled=cfg.amp):
@@ -256,6 +269,9 @@ def train():
             # logging end
             # ----Mini batch end
         # ----Epoch end
+
+        if cfg.chlast:
+            model = model.to(memory_format=torch.contiguous_format)
 
         # Evaluation
         _log_dic = {'general/epoch': epoch}
