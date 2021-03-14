@@ -61,5 +61,5 @@ if __name__ == '__main__':
     parser.add_argument('--quality', type=int, default=23)
     args = parser.parse_args()
 
-    jpeg(split=args.split, quality=args.quality)
-    # get_bpp(split=f'{args.split}_jpeg{args.quality}')
+    # jpeg(split=args.split, quality=args.quality)
+    get_bpp(split=f'{args.split}_jpeg{args.quality}')
