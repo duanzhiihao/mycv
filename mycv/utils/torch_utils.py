@@ -78,9 +78,8 @@ def load_partial_optimizer(optimizer, state, verbose=True):
 
 
 def rename_weights(weights, old, new, verbose=True):
-    print('=======================================================================')
-    print('Warning: rename_weights() is Deprecated. Use weights_replace() instead.')
-    print('=======================================================================')
+    from mycv.utils.general import warning
+    warning('rename_weights() is Deprecated. Use weights_replace() instead.')
     return weights_replace(weights, old, new, verbose)
 
 
@@ -149,6 +148,8 @@ def initialize_weights(model):
 
 
 def warmup_cosine(n, min_lrf, warmup_iter, total_iter):
+    from mycv.utils.general import warning
+    warning('torch_utils.warmup_cosine() is deprecated. Use lr_schedulers.warmup_cosine()')
     if n < warmup_iter:
         factor = n / warmup_iter
     else:
@@ -166,6 +167,8 @@ def adjust_lr_threestep(optimizer, cur_epoch, base_lr, total_epoch):
         base_lr (float): base learning rate
         total_epoch (int): total epoch
     """
+    from mycv.utils.general import warning
+    warning('torch_utils.adjust_lr_threestep() is deprecated. Use lr_schedulers.')
     assert total_epoch >= 3
     period = math.ceil(total_epoch / 3)
     lr = base_lr * (0.1 ** (cur_epoch // period))
@@ -173,6 +176,8 @@ def adjust_lr_threestep(optimizer, cur_epoch, base_lr, total_epoch):
         param_group['lr'] = lr
 
 def _adjust_lr_532(optimizer, cur_epoch, base_lr, total_epoch):
+    from mycv.utils.general import warning
+    warning('torch_utils._adjust_lr_532() is deprecated. Use lr_schedulers.')
     assert total_epoch % 10 == 0
     if cur_epoch < round(total_epoch * 5/10):
         lrf = 1
