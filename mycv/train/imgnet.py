@@ -11,7 +11,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import torch.cuda.amp as amp
-# from torch.optim.lr_scheduler import LambdaLR
 
 from mycv.utils.general import increment_dir
 from mycv.utils.torch_utils import set_random_seeds, ModelEMA, is_parallel
@@ -42,7 +41,7 @@ def train():
     parser.add_argument('--lr',         type=float,default=0.1)
     parser.add_argument('--amp',        type=bool, default=True)
     parser.add_argument('--ema',        type=bool, default=True)
-    parser.add_argument('--epochs',     type=int,  default=90)
+    parser.add_argument('--epochs',     type=int,  default=100)
     parser.add_argument('--study',      type=bool, default=False)
     parser.add_argument('--chlast',     action='store_true')
     parser.add_argument('--device',     type=int,  default=[0], nargs='+')
