@@ -160,10 +160,12 @@ def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, dataset
     elif dataset == 'imagenet':
         from mycv.paths import IMAGENET_DIR
         img_dir = IMAGENET_DIR / 'val'
+    elif dataset == 'cityscapes':
+        from mycv.paths import CITYSCAPES_DIR
+        img_dir = CITYSCAPES_DIR / 'leftImg8bit/val'
     else:
         img_dir = dataset
-    img_names = os.listdir(img_dir)
-    img_paths = [str(img_dir / imname) for imname in img_names]
+    img_paths = [str(p) for p in img_dir.glob('**/*.*')]
     img_paths.sort()
 
     # traverse the dataset

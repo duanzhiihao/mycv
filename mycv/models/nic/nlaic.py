@@ -236,12 +236,12 @@ if __name__ == "__main__":
     # load_partial(model.context, MYCV_DIR / 'weights/nlaic/msssim4p.pkl')
     # torch.save(model.state_dict(), MYCV_DIR / 'weights/nlaic/nlaic_ms4_2.pt')
     # exit()
-    load_partial(model, MYCV_DIR / 'weights/nlaic/nlaic_ms4_2.pt')
+    load_partial(model, MYCV_DIR / 'weights/nlaic/nlaic_ms64.pt')
     # load_partial(model, MYCV_DIR / 'weights/nlaic/nlaic_mse200_2.pt')
     model = model.cuda()
     model.eval()
 
     from mycv.datasets.imcoding import nic_evaluate
     # results = nic_evaluate(model, input_norm=False, dataset='kodak')
-    results = nic_evaluate(model, input_norm=False, dataset='imagenet')
+    results = nic_evaluate(model, input_norm=False, dataset='cityscapes')
     print(results)
