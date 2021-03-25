@@ -1,5 +1,6 @@
 # scripts
 _test*
+paths.py
 
 # folders
 runs/
