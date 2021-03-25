@@ -9,25 +9,28 @@ from pathlib import Path
 MYCV_DIR = Path(os.path.dirname(__file__))
 
 # CLIC dataset: http://www.compression.cc/
-CLIC_DIR = Path('/ssd1/Datasets/CLIC')
+CLIC_DIR = Path('/path_to/datasets/clic')
 
 # Kodak dataset: http://www.cs.albany.edu/~xypan/research/snr/Kodak.html
-KODAK_DIR = Path('/ssd1/Datasets/Kodak')
+KODAK_DIR = Path('/path_to/datasets/kodak')
 
 # ImageNet dataset
-IMAGENET_DIR = Path('/ssd1/Datasets/imagenet')
+IMAGENET_DIR = Path('/path_to/datasets/imagenet')
 
 # Food-101 dataset
-FOOD101_DIR = Path('/ssd1/Datasets/food-101')
+FOOD101_DIR = Path('/path_to/datasets/food-101')
 
 # Cityscapes dataset: https://www.cityscapes-dataset.com/
-CITYSCAPES_DIR = Path('/ssd1/Datasets/Cityscapes')
+CITYSCAPES_DIR = Path('/path_to/datasets/cityscapes')
 
 # COCO dataset: http://cocodataset.org/#home
-COCO_DIR = Path('/ssd1/Datasets/COCO')
+COCO_DIR = Path('/path_to/datasets/coco')
 
 # MW-R, HABBOF, and CEPDOF dataset: http://vip.bu.edu/projects/vsns/cossy/datasets/
-COSSY_DIR = Path('/home/duanzh/Projects/Datasets/COSSY')
+COSSY_DIR = Path('/path_to/datasets/cossy')
 
 # UCF-101 dataset
-UCF101_DIR = Path('/ssd1/Datasets/UCF-101')
+UCF101_DIR = Path('/path_to/datasets/ucf-101')
+
+# DAVIS 2017 dataset: https://davischallenge.org/davis2017/code.html
+DAVIS_DIR = Path(/path_to/datasets/davis')
