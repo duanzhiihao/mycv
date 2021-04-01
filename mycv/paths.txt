@@ -33,4 +33,4 @@ COSSY_DIR = Path('/path_to/datasets/cossy')
 UCF101_DIR = Path('/path_to/datasets/ucf-101')
 
 # DAVIS 2017 dataset: https://davischallenge.org/davis2017/code.html
-DAVIS_DIR = Path(/path_to/datasets/davis')
+DAVIS_DIR = Path('/path_to/datasets/davis')
