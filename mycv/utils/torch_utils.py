@@ -77,10 +77,10 @@ def load_partial_optimizer(optimizer, state, verbose=True):
     debug = 1
 
 
-def rename_weights(weights, old, new, verbose=True):
-    from mycv.utils.general import warning
-    warning('rename_weights() is Deprecated. Use weights_replace() instead.')
-    return weights_replace(weights, old, new, verbose)
+# def rename_weights(weights, old, new, verbose=True):
+#     from mycv.utils.general import warning
+#     warning('rename_weights() is Deprecated. Use weights_replace() instead.')
+#     return weights_replace(weights, old, new, verbose)
 
 
 def weights_replace(weights, old, new, verbose=True):

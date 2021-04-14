@@ -128,7 +128,8 @@ def pad_divisible(im: np.ndarray, div: int, mode='zero'):
         padded[:h_old, :w_old, :] = im
     elif mode == 'replicate':
         top, left = (h_tgt - h_old) // 2, (w_tgt - w_old) // 2
-        padded = np.pad(im, (top, h_tgt-top, left, w_tgt-left), mode='edge')
+        padded = np.pad(im, [(top, h_tgt-h_old-top), (left, w_tgt-w_old-left), (0, 0)],
+                        mode='edge')
     else:
         raise ValueError()
     return padded
