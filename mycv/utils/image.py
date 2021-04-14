@@ -108,15 +108,29 @@ def to_numpy_img(im: torch.Tensor, clamp=True):
     return im
 
 
-def pad_divisible(im: np.ndarray, div: int):
-    '''
-    zero-pad the bottom and right border such that the image [h,w] are multiple of div
-    '''
+def pad_divisible(im: np.ndarray, div: int, mode='zero'):
+    """ pad the image borders such that the image [h,w] are multiples of div
+
+    Args:
+        im (np.ndarray): input image
+        div (int): the output dimension will be multiples of div
+        mode (str, optional): padding mode. Defaults to 'zero'.
+
+    Returns:
+        np.ndarray: padded image
+    """
+    assert is_image(im, cv2_ok=True, pil_ok=False)
     h_old, w_old, ch = im.shape
-    h_pad = round(div * np.ceil(h_old / div))
-    w_pad = round(div * np.ceil(w_old / div))
-    padded = np.zeros([h_pad, w_pad, ch], dtype=im.dtype)
-    padded[:h_old, :w_old, :] = im
+    h_tgt = round(div * np.ceil(h_old / div))
+    w_tgt = round(div * np.ceil(w_old / div))
+    if mode == 'zero':
+        padded = np.zeros([h_tgt, w_tgt, ch], dtype=im.dtype)
+        padded[:h_old, :w_old, :] = im
+    elif mode == 'replicate':
+        top, left = (h_tgt - h_old) // 2, (w_tgt - w_old) // 2
+        padded = np.pad(im, (top, h_tgt-top, left, w_tgt-left), mode='edge')
+    else:
+        raise ValueError()
     return padded
 
 
