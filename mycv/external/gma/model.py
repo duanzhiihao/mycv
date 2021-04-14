@@ -3,12 +3,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.cuda import amp
 
-from gma.update import GMAUpdateBlock
-from gma.extractor import BasicEncoder
-from gma.corr import CorrBlock
-from gma.utils.utils import bilinear_sampler, coords_grid, upflow8
-from gma.gma import Attention, Aggregate
-
+from .update import GMAUpdateBlock
+from .extractor import BasicEncoder
+from .corr import CorrBlock
+from .utils.utils import bilinear_sampler, coords_grid, upflow8
+from .gma import Attention, Aggregate
 
 
 class RAFTGMA(nn.Module):
@@ -59,7 +58,6 @@ class RAFTGMA(nn.Module):
 
     def forward(self, image1, image2, iters=12, flow_init=None, upsample=True, test_mode=False):
         """ Estimate optical flow between pair of frames """
-
         image1 = 2 * (image1 / 255.0) - 1.0
         image2 = 2 * (image2 / 255.0) - 1.0
 
