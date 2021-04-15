@@ -14,11 +14,8 @@ CLIC_DIR = Path('/path_to/datasets/clic')
 # Kodak dataset: http://www.cs.albany.edu/~xypan/research/snr/Kodak.html
 KODAK_DIR = Path('/path_to/datasets/kodak')
 
-# ImageNet dataset
+# ImageNet dataset: http://www.image-net.org/
 IMAGENET_DIR = Path('/path_to/datasets/imagenet')
-
-# Food-101 dataset
-FOOD101_DIR = Path('/path_to/datasets/food-101')
 
 # Cityscapes dataset: https://www.cityscapes-dataset.com/
 CITYSCAPES_DIR = Path('/path_to/datasets/cityscapes')
@@ -29,8 +26,11 @@ COCO_DIR = Path('/path_to/datasets/coco')
 # MW-R, HABBOF, and CEPDOF dataset: http://vip.bu.edu/projects/vsns/cossy/datasets/
 COSSY_DIR = Path('/path_to/datasets/cossy')
 
-# UCF-101 dataset
+# UCF-101 dataset: https://www.crcv.ucf.edu/data/UCF101.php
 UCF101_DIR = Path('/path_to/datasets/ucf-101')
 
 # DAVIS 2017 dataset: https://davischallenge.org/davis2017/code.html
 DAVIS_DIR = Path('/path_to/datasets/davis')
+
+# MPI Sintel dataset: http://sintel.is.tue.mpg.de/
+SINTEL_DIR = Path('/path_to/datasets/sintel')
