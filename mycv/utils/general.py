@@ -45,34 +45,14 @@ def warning(msg: str):
     print('=======================================================================')
 
 
-# def wb_increment_id(dir_root='wandb/', name='exp'):
-#     """ Increament wandb run name. E.g., xxx-exp1, yyy-exp2, zzz-exp3, ...
-#     """
-#     assert isinstance(dir_root, (str, Path))
-#     dir_root = Path(dir_root)
-#     if not dir_root.exists():
-#         print(f'Warning: {dir_root} does not exist. Creating it...')
-#         os.makedirs(dir_root)
-#     assert dir_root.is_dir()
+class SimpleConfig():
+    """ A simple config class
+    """
+    def __init__(self) -> None:
+        pass
 
-#     wandb_ids = []
-#     for fname in os.listdir(dir_root):
-#         assert fname.startswith('run-') or fname.startswith('offline-run-')
-#         fname = remove_prefix(fname, 'run-')
-#         fname = remove_prefix(fname, 'offline-run-')
-#         assert fname[8] == '_' and fname[15] == '-'
-#         fname = fname[16:]
-#         assert len(fname) > 0
-#         wandb_ids.append(fname)
-#     dnames = [s for s in wandb_ids if s.startswith(name)]
-#     if len(dnames) > 0:
-#         dnames = [s[len(name):] for s in dnames]
-#         ids = [int(re.search(r'\d+', s).group()) for s in dnames]
-#         n = max(ids) + 1
-#     else:
-#         n = 0
-#     name = f'{name}_{n}' if name[-1].isdigit() else f'{name}{n}'
-#     return name
+    def __setattr__(self, name: str, value) -> None:
+        self.__dict__[name] = value
 
 
 # def remove_prefix(s: str, prefix: str):
@@ -80,3 +60,9 @@ def warning(msg: str):
 #     if s.startswith(prefix):
 #         s = s[len(prefix):]
 #     return s
+
+
+if __name__ == '__main__':
+    cfg = SimpleConfig()
+    cfg.abc = '123'
+    print(cfg.abc)
