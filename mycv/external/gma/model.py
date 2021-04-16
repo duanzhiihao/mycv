@@ -9,16 +9,23 @@ from .corr import CorrBlock
 from .utils.utils import coords_grid, upflow8
 from .gma import Attention
 
+from mycv.utils.general import SimpleConfig
 
 class RAFTGMA(nn.Module):
-    def __init__(self, args):
+    def __init__(self, args=None):
         super().__init__()
+        if args is None:
+            args = SimpleConfig()
+            args.num_heads = 1
+            args.position_only = False
+            args.position_and_content = False
+            args.mixed_precision = False
         self.args = args
 
         self.hidden_dim = hdim = 128
         self.context_dim = cdim = 128
-        args.corr_levels = 4
-        args.corr_radius = 4
+        self.args.corr_levels = 4
+        self.args.corr_radius = 4
 
         if 'dropout' not in self.args:
             self.args.dropout = 0
