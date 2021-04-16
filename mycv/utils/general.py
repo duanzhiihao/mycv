@@ -54,6 +54,8 @@ class SimpleConfig():
     def __setattr__(self, name: str, value) -> None:
         self.__dict__[name] = value
 
+    def __contains__(self, name):
+        return name in self.__dict__
 
 # def remove_prefix(s: str, prefix: str):
 #     assert isinstance(s, str) and isinstance(prefix, str)
