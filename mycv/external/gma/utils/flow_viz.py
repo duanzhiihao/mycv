@@ -121,6 +121,7 @@ def flow_to_image(flow_uv, clip_flow=None, convert_to_bgr=False):
     assert flow_uv.ndim == 3, 'input flow must have three dimensions'
     assert flow_uv.shape[2] == 2, 'input flow must have shape [H,W,2]'
     if clip_flow is not None:
+        raise DeprecationWarning()
         flow_uv = np.clip(flow_uv, 0, clip_flow)
     u = flow_uv[:,:,0]
     v = flow_uv[:,:,1]
