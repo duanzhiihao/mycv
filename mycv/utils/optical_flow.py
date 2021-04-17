@@ -42,7 +42,7 @@ def backward_warp(x: torch.Tensor, flow: torch.Tensor):
 def forward_warp_numpy(im1: np.ndarray, flow: np.ndarray):
     """ Forward warp image1 to image2 according to the optical flow
     """
-    nH, nW, _ = im1.shape
+    nH, nW = im1.shape[:2]
     assert flow.shape == (nH, nW, 2)
 
     # image1 coordinates
@@ -56,14 +56,14 @@ def forward_warp_numpy(im1: np.ndarray, flow: np.ndarray):
     x1, y1, x2, y2 = x1[valid], y1[valid], x2[valid], y2[valid]
     # warp
     warped = np.zeros_like(im1)
-    warped[:,:,1] = 255
-    warped[y2, x2, :] = im1[y1, x1, :]
+    warped[y2, x2, ...] = im1[y1, x1, ...]
     if False:
         import matplotlib.pyplot as plt
+        warped[:,:,1] = 255
         plt.figure(); plt.imshow(warped.astype(np.uint8)); plt.show()
     # simply 'interpolate' using the original image1
     interp_mask = np.ones((nH, nW), dtype=np.bool)
     interp_mask[y2, x2] = False
-    warped[interp_mask, :] = im1[interp_mask, :]
+    warped[interp_mask, ...] = im1[interp_mask, ...]
 
     return warped, interp_mask
