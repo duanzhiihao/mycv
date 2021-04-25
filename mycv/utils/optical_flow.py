@@ -59,8 +59,10 @@ def forward_warp_numpy(im1: np.ndarray, flow: np.ndarray):
     warped[y2, x2, ...] = im1[y1, x1, ...]
     if False:
         import matplotlib.pyplot as plt
-        warped[:,:,1] = 255
-        plt.figure(); plt.imshow(warped.astype(np.uint8)); plt.show()
+        _im = warped.astype(np.uint8)
+        import cv2; cv2.imwrite('warped.png', cv2.cvtColor(_im, cv2.COLOR_RGB2BGR))
+        plt.figure(); plt.imshow(_im); plt.show()
+        debug = 1
     # simply 'interpolate' using the original image1
     interp_mask = np.ones((nH, nW), dtype=np.bool)
     interp_mask[y2, x2] = False
