@@ -23,7 +23,6 @@ Resnet-50, imagenet200_600
 | res50_5 |       | SGD+nesterov |           | 75.8/75.4       | 77.6/76.8     |
 |         | 0.01  | SGD          | mean      | 72.9/72.9       | 75.7/74.8     |
 
-
 Resnet-50, full imagenet
 | Run     | lr    | lr schedule | Reduction | Batchsize | Epochs | Plain best/last | EMA best/last |
 |---------|-------|-------------|-----------|-----------|--------|-----------------|---------------|
@@ -32,3 +31,13 @@ Resnet-50, full imagenet
 | res50_1 |       |             |           |           |        | 75.51/75.36     | 75.87/75.87   |
 | res50   |       |             |           | 128x2 dp  |        | r               | r             |
 | res50   |       |             |           | 128x2 ac  |        |                 |               |
+
+
+## Model comparison
+| Model               | input_size | FLOPs | Acts | bs64w4 val time (s) | top-1 |
+|---------------------|------------|-------|------|---------------------|-------|
+| ResNet-50, tv       | 224        | 4.10  |      | 62                  | 76.0  |
+| Swin-tiny, official | 224        | 4.5*  |      | 62                  | 80.9  |
+| RegNetZ             |            |       |      |                     |       |
+| Placeholder         |            |       |      |                     |       |
+| Placeholder         |            |       |      |                     |       |
