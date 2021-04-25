@@ -169,27 +169,29 @@ def resnet152(num_classes):
 
 if __name__ == '__main__':
     from tqdm import tqdm
-    from thop import profile, clever_format
-    from fvcore.nn import flop_count
     from mycv.paths import MYCV_DIR
     from mycv.datasets.imagenet import imagenet_val
 
     model = resnet50(1000)
-    model = model.cuda()
+    # model = model.cuda()
     model.eval()
 
-    checkpoint = torch.load(MYCV_DIR / 'weights/res50_normfalse.pt')
-    model.load_state_dict(checkpoint['model'])
-    results = imagenet_val(model, split='val',
-                img_size=224, batch_size=64, workers=4, input_norm=False)
-    print(results)
+    # checkpoint = torch.load(MYCV_DIR / 'weights/res50_normfalse.pt')
+    # model.load_state_dict(checkpoint['model'])
+    # weights = torch.load(MYCV_DIR / 'weights/resnet/resnet50-19c8e357.pth')
+    # model.load_state_dict(weights)
+    # results = imagenet_val(model, split='val',
+    #             img_size=224, batch_size=64, workers=4, input_norm=True)
+    # print(results)
 
-    # input = torch.randn(1, 3, 224, 224)
-    # macs, params = profile(model, inputs=(input, ))
-    # macs, params = clever_format([macs, params], "%.3f")
-    # print(macs, params)
-    # final_count, skipped_ops = flop_count(model, (input, )) 
-    # print(final_count)
+    from thop import profile, clever_format
+    from fvcore.nn import flop_count
+    input = torch.randn(1, 3, 224, 224)
+    macs, params = profile(model, inputs=(input, ))
+    macs, params = clever_format([macs, params], "%.3f")
+    print(macs, params)
+    final_count, skipped_ops = flop_count(model, (input, )) 
+    print(final_count)
 
     # model = model.cuda()
     # model.eval()
