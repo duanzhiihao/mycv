@@ -1,3 +1,4 @@
+import os
 from numpy.lib.polynomial import polyval
 import torch
 import numpy as np
@@ -189,3 +190,42 @@ def colorize_semseg(gray: torch.LongTensor, palette='cityscapes'):
     painting[fgmask] = colors[gray[fgmask].to(dtype=torch.int64)]
     # painting = colors[gray]
     return painting
+
+
+def _entropy(layer):
+    total = layer.numel()
+    hist = torch.bincount(layer.view(-1))
+    p = hist.float() / total
+    H = p * torch.log2(p)
+    H[torch.isnan(H)] = 0
+    H = - H.sum()
+    return H
+
+def topk_entropy(x: torch.Tensor, k: int, save_dir=None):
+    """ Get the k layers with the highest information entropy
+
+    Args:
+        x (torch.Tensor): feature map
+        k (int): k
+    """
+    assert not x.requires_grad
+    x = x.squeeze(0).cpu()
+    assert x.dim() == 3
+    x = (x - x.min()) * 255 / x.max()
+    x = x.to(dtype=torch.int64)
+    entropys = []
+    for i in range(x.shape[0]):
+        H = _entropy(x[i])
+        entropys.append(H)
+    entropys = torch.Tensor(entropys)
+    _, kidxs = torch.topk(entropys, k)
+    xk = x[kidxs, :, :]
+    # save visualization
+    if save_dir is not None:
+        assert os.path.isdir(save_dir)
+        plt.close('all')
+        for li, layer in enumerate(xk):
+            layer = layer.to(dtype=torch.uint8).numpy()
+            plt.imshow(layer, cmap='gray')
+            plt.savefig(f'{save_dir}/{li}.png', bbox_inches='tight')
+    return xk

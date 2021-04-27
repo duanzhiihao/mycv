@@ -217,6 +217,7 @@ class Dec(nn.Module):
         self.conv1 = conv2d(self.M1, self.input, 5, 1, 2)
 
     def forward(self, x):
+        # from mycv.utils.visualization import topk_entropy
         x = self.trunk1(x) * torch.sigmoid(self.mask1(x)) + x
         x = self.up1(x)
         x = self.trunk2(x)
