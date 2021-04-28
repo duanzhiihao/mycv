@@ -228,4 +228,30 @@ def topk_entropy(x: torch.Tensor, k: int, save_dir=None):
             layer = layer.to(dtype=torch.uint8).numpy()
             plt.imshow(layer, cmap='gray')
             plt.savefig(f'{save_dir}/{li}.png', bbox_inches='tight')
-    return xk
+    return xk, kidxs
+
+
+def zoom_in(im: np.ndarray, zoom_center_hw: tuple, window_hw, scale, loc='br'):
+    assert isinstance(zoom_center_hw, tuple)
+    im = np.copy(im)
+
+    # center h, center w
+    ch, cw = zoom_center_hw
+    # window h, window w
+    if isinstance(window_hw, int):
+        wh, ww = window_hw, window_hw
+    else:
+        wh, ww = window_hw
+    # extract window
+    window = im[ch-wh//2:ch+wh-wh//2, cw-ww//2:cw+ww-ww//2, :]
+    # target window h, w
+    twh, tww = round(wh*scale), round(ww*scale)
+    # resize window
+    window = cv2.resize(window, (tww, twh), interpolation=cv2.INTER_NEAREST)
+    # paste to the original image
+    if loc == 'br': # bottom-right
+        im[-twh:, -tww:, :] = window
+    else:
+        raise ValueError()
+
+    return im
