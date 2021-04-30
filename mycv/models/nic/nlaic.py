@@ -22,6 +22,7 @@ class NLAIC(nn.Module):
                            enable_hyper=enable_bpp) # 22.5M
         self.decoder = Dec(input_channels, N1, M, M1) # 13.8M
         self.enable_bpp = enable_bpp
+        self.latent_channels = M
         if not enable_bpp:
             return
 
@@ -233,16 +234,16 @@ if __name__ == "__main__":
     from mycv.utils.torch_utils import load_partial, num_params
     model = NLAIC(enable_bpp=True)
     print(num_params(model))
-    # load_partial(model, MYCV_DIR / 'weights/nlaic/msssim4.pkl')
-    # load_partial(model.context, MYCV_DIR / 'weights/nlaic/msssim4p.pkl')
-    # torch.save(model.state_dict(), MYCV_DIR / 'weights/nlaic/nlaic_ms4_2.pt')
+    # load_partial(model, MYCV_DIR / 'weights/nlaic/mse6400.pkl')
+    # load_partial(model.context, MYCV_DIR / 'weights/nlaic/mse6400p.pkl')
+    # torch.save(model.state_dict(), MYCV_DIR / 'weights/nlaic/nlaic_mse6400.pt')
     # exit()
-    load_partial(model, MYCV_DIR / 'weights/nlaic/nlaic_ms64.pt')
+    load_partial(model, MYCV_DIR / 'weights/nlaic/nlaic_mse6400.pt')
     # load_partial(model, MYCV_DIR / 'weights/nlaic/nlaic_mse200_2.pt')
     model = model.cuda()
     model.eval()
 
     from mycv.datasets.imcoding import nic_evaluate
     # results = nic_evaluate(model, input_norm=False, dataset='kodak')
-    results = nic_evaluate(model, input_norm=False, dataset='cityscapes')
+    results = nic_evaluate(model, input_norm=False, dataset='kodak')
     print(results)
