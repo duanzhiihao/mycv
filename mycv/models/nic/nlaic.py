@@ -194,6 +194,7 @@ class Dec(nn.Module):
         self.trunk1 = nn.Sequential(
             *[ResBlock(M) for _ in range(3)]
         )
+        self.trunk1i = nn.Identity()
         self.mask1 = nn.Sequential(
             Non_local_Block(self.M, self.M // 2),
             *[ResBlock(M) for _ in range(3)],
@@ -220,6 +221,7 @@ class Dec(nn.Module):
     def forward(self, x):
         # from mycv.utils.visualization import topk_entropy
         x = self.trunk1(x) * torch.sigmoid(self.mask1(x)) + x
+        x = self.trunk1i(x)
         x = self.up1(x)
         x = self.trunk2(x)
         x = self.trunk3(x)
@@ -234,11 +236,11 @@ if __name__ == "__main__":
     from mycv.utils.torch_utils import load_partial, num_params
     model = NLAIC(enable_bpp=True)
     print(num_params(model))
-    # load_partial(model, MYCV_DIR / 'weights/nlaic/mse6400.pkl')
-    # load_partial(model.context, MYCV_DIR / 'weights/nlaic/mse6400p.pkl')
-    # torch.save(model.state_dict(), MYCV_DIR / 'weights/nlaic/nlaic_mse6400.pt')
+    # load_partial(model, MYCV_DIR / 'weights/nlaic/mse3200.pkl')
+    # load_partial(model.context, MYCV_DIR / 'weights/nlaic/mse3200p.pkl')
+    # torch.save(model.state_dict(), MYCV_DIR / 'weights/nlaic/nlaic_mse3200.pt')
     # exit()
-    load_partial(model, MYCV_DIR / 'weights/nlaic/nlaic_mse6400.pt')
+    load_partial(model, MYCV_DIR / 'weights/nlaic/nlaic_mse3200.pt')
     # load_partial(model, MYCV_DIR / 'weights/nlaic/nlaic_mse200_2.pt')
     model = model.cuda()
     model.eval()

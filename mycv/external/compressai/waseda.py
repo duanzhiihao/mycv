@@ -90,5 +90,19 @@ class Cheng2020Anchor(nn.Module):
 
 
 if __name__ == '__main__':
+    from mycv.paths import MYCV_DIR
+    from mycv.utils.torch_utils import load_partial
+
+    # from compressai.zoo import cheng2020_anchor
+    # model = cheng2020_anchor(4, metric='mse', pretrained=True)
+    # torch.save(model.state_dict(), MYCV_DIR / f'weights/compressai/cheng2020-anchor-4.pt')
+
     model = Cheng2020Anchor(N=192, enable_bpp=False)
-    weights_path = MYCV_DIR / f'weights/compressai/cheng2020-anchor-5.pt'
+    weights_path = MYCV_DIR / f'weights/compressai/cheng2020-anchor-4.pt'
+    load_partial(model, weights_path)
+    model = model.cuda()
+    model.eval()
+
+    from mycv.datasets.imcoding import nic_evaluate
+    results = nic_evaluate(model, input_norm=False, dataset='kodak')
+    print(results)
