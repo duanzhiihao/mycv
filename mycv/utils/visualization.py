@@ -211,7 +211,8 @@ def topk_entropy(x: torch.Tensor, k: int, save_dir=None):
     assert not x.requires_grad
     x = x.squeeze(0).cpu()
     assert x.dim() == 3
-    x = (x - x.min()) * 255 / x.max()
+    x = x - x.min()
+    x = x * 255 / x.max()
     x = x.to(dtype=torch.int64)
     entropys = []
     for i in range(x.shape[0]):
