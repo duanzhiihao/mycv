@@ -226,3 +226,20 @@ def letterbox(img: np.ndarray, tgt_size:int=640, side='longer', to_square=True, 
     img = cv2.copyMakeBorder(img, top, bottom, left, right,
                                 borderType=cv2.BORDER_CONSTANT, value=color)
     return img, ratio, (top, left)
+
+
+def psnr_dB(img1: np.ndarray, img2: np.ndarray):
+    """ Calculate PSNR between two images in terms of dB
+
+    Args:
+        img1 (np.ndarray): image 1.
+        img2 (np.ndarray): image 2
+    """
+    assert is_image(img1, pil_ok=False) and is_image(img2, pil_ok=False)
+    assert img1.shape == img2.shape
+
+    img1, img2 = img1.astype(np.float32), img2.astype(np.float32)
+    mse = np.mean(np.square(img1 - img2))
+    if mse == 0:
+        return 100
+    return 10 * np.log10(255.0**2 / mse)

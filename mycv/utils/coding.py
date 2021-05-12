@@ -5,23 +5,6 @@ import torch.nn.functional as tnf
 import mycv.utils.image as imgUtils
 
 
-def psnr_dB(img1: np.ndarray, img2: np.ndarray):
-    """ Calculate PSNR between two images in terms of dB
-
-    Args:
-        img1 (np.ndarray): image 1.
-        img2 (np.ndarray): image 2
-    """
-    assert imgUtils.is_image(img1) and imgUtils.is_image(img2)
-    assert img1.shape == img2.shape
-
-    img1, img2 = img1.astype(np.float32), img2.astype(np.float32)
-    mse = np.mean(np.square(img1 - img2))
-    if mse == 0:
-        return 100
-    return 10 * np.log10(255.0**2 / mse)
-
-
 def cal_bpp(prob: torch.Tensor, num_pixels: int):
     """ bitrate per pixel
 
