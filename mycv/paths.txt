@@ -14,6 +14,9 @@ CLIC_DIR = Path('/path_to/datasets/clic')
 # Kodak dataset: http://www.cs.albany.edu/~xypan/research/snr/Kodak.html
 KODAK_DIR = Path('/path_to/datasets/kodak')
 
+# Super resolution datasets
+SR_DIR = Path('/path_to/datasets/sr')
+
 # ImageNet dataset: http://www.image-net.org/
 IMAGENET_DIR = Path('/path_to/datasets/imagenet')
 
