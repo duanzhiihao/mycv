@@ -67,8 +67,9 @@ class Entropy_bottleneck(nn.Module):
 
                 self._factor.append(self.factor)
 
-    def _logits_cumulative(self,logits,stop_gradient):
-        for i in range(len(self.filters) + 1):
+    def _logits_cumulative(self, logits, stop_gradient):
+        # logits: (nC, nB, nH*nW)
+        for i in range(len(self.filters) + 1): # 0, 1, 2, 3
             matrix = f.softplus(self._matrices[i])
             if stop_gradient:
                 matrix = matrix.detach()
@@ -92,9 +93,12 @@ class Entropy_bottleneck(nn.Module):
         return x + noise
 
     def forward(self, x):
+        # x: (nB, nC, nH, nW)
         x = x.permute(1,0,2,3).contiguous()
+        # x: (nC, nB, nH, nW)
         shape = x.size()
         x = x.view(shape[0],1,-1)
+        # x: (nC, nB, nH*nW)
         if self.training:
             x = _UniverseQuant.apply(x)
         else:
