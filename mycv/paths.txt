@@ -8,7 +8,7 @@ from pathlib import Path
 # Project root dir
 MYCV_DIR = Path(os.path.dirname(__file__))
 
-# CLIC dataset: http://www.compression.cc/
+# CLIC dataset: http://www.compression.cc
 CLIC_DIR = Path('/path_to/datasets/clic')
 
 # Kodak dataset: http://www.cs.albany.edu/~xypan/research/snr/Kodak.html
@@ -17,16 +17,19 @@ KODAK_DIR = Path('/path_to/datasets/kodak')
 # Super resolution datasets
 SR_DIR = Path('/path_to/datasets/sr')
 
-# ImageNet dataset: http://www.image-net.org/
+# DIV2K dataset: https://data.vision.ee.ethz.ch/cvl/DIV2K
+DIV2K_DIR = Path('/path_to/datasets/div2k')
+
+# ImageNet dataset: http://www.image-net.org
 IMAGENET_DIR = Path('/path_to/datasets/imagenet')
 
-# Cityscapes dataset: https://www.cityscapes-dataset.com/
+# Cityscapes dataset: https://www.cityscapes-dataset.com
 CITYSCAPES_DIR = Path('/path_to/datasets/cityscapes')
 
 # COCO dataset: http://cocodataset.org/#home
 COCO_DIR = Path('/path_to/datasets/coco')
 
-# MW-R, HABBOF, and CEPDOF dataset: http://vip.bu.edu/projects/vsns/cossy/datasets/
+# MW-R, HABBOF, and CEPDOF dataset: http://vip.bu.edu/projects/vsns/cossy/datasets
 COSSY_DIR = Path('/path_to/datasets/cossy')
 
 # UCF-101 dataset: https://www.crcv.ucf.edu/data/UCF101.php
@@ -35,5 +38,5 @@ UCF101_DIR = Path('/path_to/datasets/ucf-101')
 # DAVIS 2017 dataset: https://davischallenge.org/davis2017/code.html
 DAVIS_DIR = Path('/path_to/datasets/davis')
 
-# MPI Sintel dataset: http://sintel.is.tue.mpg.de/
+# MPI Sintel dataset: http://sintel.is.tue.mpg.de
 SINTEL_DIR = Path('/path_to/datasets/sintel')
