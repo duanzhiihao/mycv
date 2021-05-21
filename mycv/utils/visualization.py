@@ -232,19 +232,31 @@ def topk_entropy(x: torch.Tensor, k: int, save_dir=None):
     return xk, kidxs
 
 
-def zoom_in(im: np.ndarray, zoom_center_hw: tuple, window_hw, scale, loc='br'):
-    assert isinstance(zoom_center_hw, tuple)
-    im = np.copy(im)
+def zoom_in(im: np.ndarray, window_center_xy: tuple, window_wh, scale, loc='br'):
+    """ zoom in a window (bounding box) of the image
+
+    Args:
+        im (np.ndarray): image
+        window_center_xy (tuple): window center xy
+        window_wh (tuple, int): window width, height
+        scale (int): upsampling factor
+        loc (str, optional): new window location. Defaults to 'br'.
+    """
+    assert isinstance(window_center_xy, tuple)
+    im = np.ascontiguousarray(np.copy(im))
 
     # center h, center w
-    ch, cw = zoom_center_hw
+    cx, cy = window_center_xy
     # window h, window w
-    if isinstance(window_hw, int):
-        wh, ww = window_hw, window_hw
+    if isinstance(window_wh, int):
+       ww, wh = window_wh, window_wh
     else:
-        wh, ww = window_hw
+       ww, wh = window_wh
+    # draw bounding box
+    line_width = max(min(im.shape[:2]) // 300, 1)
+    draw_xywha_(im, cx, cy, ww, wh, 0, linewidth=line_width)
     # extract window
-    window = im[ch-wh//2:ch+wh-wh//2, cw-ww//2:cw+ww-ww//2, :]
+    window = im[cy-wh//2:cy+wh-wh//2, cx-ww//2:cx+ww-ww//2, :]
     # target window h, w
     twh, tww = round(wh*scale), round(ww*scale)
     # resize window
