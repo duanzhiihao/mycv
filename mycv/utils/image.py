@@ -149,7 +149,7 @@ def crop_divisible(im: np.ndarray, div: int):
     '''
     assert len(im.shape) == 3 and isinstance(div, int)
     h_old, w_old, _ = im.shape
-    if h_old % div == 0 and h_old % div == 0:
+    if h_old % div == 0 and w_old % div == 0:
         return im
     h_new = div * (h_old // div)
     w_new = div * (w_old // div)
