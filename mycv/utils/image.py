@@ -109,7 +109,7 @@ def to_numpy_img(im: torch.Tensor, clamp=True):
 
 
 def pad_divisible(im: np.ndarray, div: int, mode='zero'):
-    """ pad the image borders such that the image [h,w] are multiples of div
+    """ pad the image borders such that the [h,w] are multiples of div
 
     Args:
         im (np.ndarray): input image
@@ -121,6 +121,8 @@ def pad_divisible(im: np.ndarray, div: int, mode='zero'):
     """
     assert is_image(im, cv2_ok=True, pil_ok=False)
     h_old, w_old, ch = im.shape
+    if h_old % div == 0 and h_old % div == 0:
+        return im
     h_tgt = round(div * np.ceil(h_old / div))
     w_tgt = round(div * np.ceil(w_old / div))
     if mode == 'zero':
@@ -136,11 +138,19 @@ def pad_divisible(im: np.ndarray, div: int, mode='zero'):
 
 
 def crop_divisible(im: np.ndarray, div: int):
-    '''
-    Crop sides and remain the center part such that the image [h,w] are multiple of div
+    ''' center crop the image such that the [h,w] are multiples of div
+
+    Args:
+        im (np.ndarray): input image
+        div (int): the output dimension will be multiples of div
+
+    Returns:
+        np.ndarray: padded image
     '''
     assert len(im.shape) == 3 and isinstance(div, int)
-    h_old, w_old, ch = im.shape
+    h_old, w_old, _ = im.shape
+    if h_old % div == 0 and h_old % div == 0:
+        return im
     h_new = div * (h_old // div)
     w_new = div * (w_old // div)
     top = (h_old - h_new) // 2

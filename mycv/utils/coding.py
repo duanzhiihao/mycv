@@ -37,7 +37,7 @@ class MS_SSIM(torch.nn.Module):
     ''' Adapted from https://github.com/lizhengwei1992/MS_SSIM_pytorch
     '''
     def __init__(self, max_val=1.0, reduction='mean'):
-        super(MS_SSIM, self).__init__()
+        super().__init__()
         self.channel = 3
         self.max_val = max_val
         self.weight = torch.Tensor([0.0448, 0.2856, 0.3001, 0.2363, 0.1333])
