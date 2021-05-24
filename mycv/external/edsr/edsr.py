@@ -79,7 +79,7 @@ class EDSR(nn.Module):
         x = self.tail(res)
         x = self.add_mean(x)
         return x
-    
+
     def sr_numpy(self, lr):
         device = self.sub_mean.bias.device
         x = torch.from_numpy(lr).float().permute(2,0,1).unsqueeze(0)
@@ -111,7 +111,7 @@ class EDSR(nn.Module):
 
 if __name__ == '__main__':
     from mycv.paths import MYCV_DIR
-    scale = 4
+    scale = 2
     model = EDSR('baseline', scale=scale)
 
     wpath = MYCV_DIR / f'weights/edsr/edsr_baseline_x{scale}.pt'
@@ -120,6 +120,25 @@ if __name__ == '__main__':
 
     model = model.cuda()
     model.eval()
+
+    model = model.cuda()
+    from tqdm import tqdm
+    for _ in tqdm(range(256)):
+        lr = torch.rand(1, 3, 512, 512, device='cuda:0') * 255 - 128
+        rec = model(lr)
+        assert rec.shape == (1, 3, 1024, 1024)
+
+    model = model.cpu()
+    from thop import profile, clever_format
+    from fvcore.nn import flop_count
+    lr = torch.randn(1, 3, 512, 512)
+    final_count, skipped_ops = flop_count(model, (lr, )) 
+    print(final_count)
+    macs, params = profile(model, inputs=(lr, ))
+    macs, params = clever_format([macs, params], "%.3f")
+    print(macs, params)
+
+    exit()
 
     from mycv.datasets.superres import sr_evaluate
     results = sr_evaluate(model, dataset='set14', scale=scale)
