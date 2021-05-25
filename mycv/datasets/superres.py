@@ -1,6 +1,7 @@
 import os
 from tqdm import tqdm
 from pathlib import Path
+import random
 import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
@@ -10,10 +11,20 @@ import torch
 from mycv.utils.image import psnr_dB, crop_divisible
 
 
-def sr_evaluate(model, dataset, scale, verbose=True):
-    from mycv.paths import DIV2K_DIR
+def get_dir(dataset, scale):
+    """ Get dataset HR folder and LR folder
 
-    if dataset == 'div2k_bicubic':
+    Args:
+        dataset (str): dataset name
+        scale (int): super resolution factor
+    """
+    if dataset == 'div2k_train':
+        from mycv.paths import DIV2K_DIR
+        assert scale in (2, 3, 4)
+        hr_dir = DIV2K_DIR / 'train_hr'
+        lr_dir = DIV2K_DIR / f'train_lr_bicubic/x{scale}'
+    elif dataset == 'div2k_val':
+        from mycv.paths import DIV2K_DIR
         assert scale in (2, 3, 4)
         hr_dir = DIV2K_DIR / 'val_hr'
         lr_dir = DIV2K_DIR / f'val_lr_bicubic/x{scale}'
@@ -29,7 +40,95 @@ def sr_evaluate(model, dataset, scale, verbose=True):
         assert os.path.isdir(dataset)
         hr_dir = Path(dataset)
         lr_dir = None
+    return hr_dir, lr_dir
 
+
+class SRDataset(torch.utils.data.Dataset):
+    def __init__(self, dataset, scale, lr_size=48, verbose=True):
+        hr_dir, lr_dir = get_dir(dataset, scale)
+        hr_names = os.listdir(hr_dir)
+        self.hr_paths = [str(hr_dir / hname) for hname in hr_names]
+        self.lr_paths = [str(lr_dir / hname.replace('.png', f'x{scale}.png')) \
+                         for hname in hr_names]
+        self.lr_size = lr_size
+        if verbose:
+            print('Checking LR images...')
+            for lpath in tqdm(self.lr_paths):
+                assert os.path.exists(lpath)
+
+    def __len__(self):
+        assert len(self.hr_paths) == len(self.lr_paths)
+        return len(self.hr_paths)
+
+    def __getitem__(self, index):
+        # load image
+        hrpath = self.hr_paths[index]
+        lrpath = self.lr_paths[index]
+        lr = cv2.cvtColor(cv2.imread(lrpath), cv2.COLOR_BGR2RGB)
+        hr = cv2.cvtColor(cv2.imread(hrpath), cv2.COLOR_BGR2RGB)
+        # random crop
+        lr, hr = random_patch(lr, hr, lr_patch_size=self.lr_size)
+        lr, hr = _random_aug(lr, hr)
+        # to tensor
+        lr = torch.from_numpy(lr).permute(2, 0, 1).float()
+        hr = torch.from_numpy(hr).permute(2, 0, 1).float()
+        return lr, hr
+
+
+def random_patch(lr, hr, lr_patch_size=48):
+    """ Get random patches from the lr and hr images
+
+    Args:
+        lr (np.ndarray): low-res image
+        hr (np.ndarray): high-res image
+        lr_patch_size (int, optional): low-res patch size. Defaults to 48.
+    """
+    # sanity check
+    lps = lr_patch_size
+    lrh, lrw = lr.shape[:2]
+    hrh, hrw = hr.shape[:2]
+    assert hrh % lrh == 0 and hrw % lrw == 0
+    scale = hrh // lrh
+
+    # top-left point in the low-res image
+    ly = random.randint(0, lrh - lps)
+    lx = random.randint(0, lrw - lps)
+    # top-left point in the high-res image
+    hy, hx = scale * ly, scale * lx
+    # get windows
+    lrwindow = lr[ly:ly+lps, lx:lx+lps, :]
+    hrwindow = hr[hy:hy+lps*scale, hx:hx+lps*scale, :]
+
+    return lrwindow, hrwindow
+
+
+def _random_aug(lr, hr):
+    if random.random() < 0.5: # vertical flip
+        lr = cv2.flip(lr, 0)
+        hr = cv2.flip(hr, 0)
+    if random.random() < 0.5: # horizontal flip
+        lr = cv2.flip(lr, 1)
+        hr = cv2.flip(hr, 1)
+    if random.random() < 0.5:
+        if random.random() < 0.5:
+            lr = cv2.rotate(lr, cv2.ROTATE_90_CLOCKWISE)
+            hr = cv2.rotate(hr, cv2.ROTATE_90_CLOCKWISE)
+        else:
+            lr = cv2.rotate(lr, cv2.ROTATE_90_COUNTERCLOCKWISE)
+            hr = cv2.rotate(hr, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    return lr, hr
+
+
+def sr_evaluate(model, dataset, scale, verbose=True):
+    """ Super resolution evalation function
+
+    Args:
+        model (torch.nn.Module): pytorch model
+        dataset (str): dataset name
+        scale (int): super resolution factor
+        verbose (bool, optional): Defaults to True.
+    """
+    hr_dir, lr_dir = get_dir(dataset, scale)
     hr_names = os.listdir(hr_dir)
     hr_names.sort()
 
@@ -85,6 +184,22 @@ def sr_evaluate(model, dataset, scale, verbose=True):
 
 
 if __name__ == '__main__':
+    scale = 2
+    dataset = SRDataset('div2k_train', scale=scale, lr_size=48)
+    trainloader = torch.utils.data.DataLoader(
+        dataset, batch_size=2, shuffle=True,
+        num_workers=0, pin_memory=True
+    )
+    for lrs, hrs in trainloader:
+        for lr,hr in zip(lrs, hrs):
+            lr = lr.permute(1,2,0).to(dtype=torch.uint8).numpy()
+            hr = hr.permute(1,2,0).to(dtype=torch.uint8).numpy()
+            lrh,lrw = lr.shape[:2]
+            lr = cv2.resize(lr, (lrw*scale,lrh*scale), interpolation=cv2.INTER_NEAREST)
+            combine = np.concatenate([lr,hr], axis=1)
+            plt.imshow(combine); plt.show()
+        debug = 1
+
     class test():
         def sr_numpy(self, lr):
             lrh, lrw = lr.shape[:2]
