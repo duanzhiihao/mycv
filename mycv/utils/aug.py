@@ -131,14 +131,14 @@ if __name__ == "__main__":
     im = cv2.imread(str(img_path))
     im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
 
-    import albumentations as album
-    import matplotlib.pyplot as plt
-    plt.figure(); plt.axis('off'); plt.imshow(im)
+    # import albumentations as album
+    # import matplotlib.pyplot as plt
+    # plt.figure(); plt.axis('off'); plt.imshow(im)
     
-    transform = album.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.7, hue=0.06, p=1)
-    for _ in range(8):
-        # imaug = augment_hsv(im, hgain=0.1, sgain=0, vgain=0)
-        imaug = transform(image=im)['image']
-        plt.figure(); plt.imshow(imaug)
+    # transform = album.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.7, hue=0.06, p=1)
+    # for _ in range(8):
+    #     # imaug = augment_hsv(im, hgain=0.1, sgain=0, vgain=0)
+    #     imaug = transform(image=im)['image']
+    #     plt.figure(); plt.imshow(imaug)
 
-    plt.show()
+    # plt.show()
