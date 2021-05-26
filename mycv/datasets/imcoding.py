@@ -7,7 +7,7 @@ import torch
 
 import mycv.utils.image as imgUtils
 import mycv.utils.aug as augUtils
-from mycv.utils.coding import psnr_dB, MS_SSIM, cal_bpp
+from mycv.utils.coding import MS_SSIM, cal_bpp
 from mycv.datasets.imagenet import ImageNetCls
 
 
@@ -204,7 +204,7 @@ def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, dataset
         # PSNR
         fake = fake.cpu().squeeze(0).permute(1, 2, 0)
         fake = (fake * 255).to(dtype=torch.uint8).numpy()
-        ps = psnr_dB(im, fake)
+        ps = imgUtils.psnr_dB(im, fake)
         # Bpp
         if probs is not None:
             if isinstance(probs, dict):

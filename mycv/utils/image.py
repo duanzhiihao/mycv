@@ -239,11 +239,11 @@ def letterbox(img: np.ndarray, tgt_size:int=640, side='longer', to_square=True, 
 
 
 def psnr_dB(img1: np.ndarray, img2: np.ndarray):
-    """ Calculate PSNR between two images in terms of dB
+    """ Compute the PSNR between two images
 
     Args:
         img1 (np.ndarray): image 1.
-        img2 (np.ndarray): image 2
+        img2 (np.ndarray): image 2.
     """
     assert is_image(img1, pil_ok=False) and is_image(img2, pil_ok=False)
     assert img1.shape == img2.shape
@@ -253,3 +253,13 @@ def psnr_dB(img1: np.ndarray, img2: np.ndarray):
     if mse == 0:
         return 100
     return 10 * np.log10(255.0**2 / mse)
+
+
+def msssim(img1: np.ndarray, img2: np.ndarray):
+    """ Compute the MS-SSIM between two images
+
+    Args:
+        img1 (np.ndarray): image 1.
+        img2 (np.ndarray): image 2.
+    """
+    raise NotImplementedError()
