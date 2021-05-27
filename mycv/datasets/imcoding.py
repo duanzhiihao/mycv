@@ -202,8 +202,8 @@ def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, dataset
         real = input_[:, :, :imh, :imw]
         ms = msssim_func(fake, real).item()
         # PSNR
-        fake = fake.cpu().squeeze(0).permute(1, 2, 0)
-        fake = (fake * 255).to(dtype=torch.uint8).numpy()
+        fake = fake.cpu().squeeze_(0).permute(1, 2, 0)
+        fake = fake.mul_(255).round_().to(dtype=torch.uint8).numpy()
         ps = imgUtils.psnr_dB(im, fake)
         # Bpp
         if probs is not None:
