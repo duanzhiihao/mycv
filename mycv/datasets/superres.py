@@ -60,7 +60,7 @@ class SRDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         assert len(self.hr_paths) == len(self.lr_paths)
-        return len(self.hr_paths) * 10
+        return len(self.hr_paths) * 20
 
     def __getitem__(self, index):
         # load image
