@@ -118,14 +118,16 @@ def pad_divisible(im: np.ndarray, div: int, mode='zero'):
 
     Returns:
         np.ndarray: padded image
+        (int, int): top, left padding
     """
     assert is_image(im, cv2_ok=True, pil_ok=False)
     h_old, w_old, ch = im.shape
     if h_old % div == 0 and h_old % div == 0:
-        return im
+        return im, (0,0)
     h_tgt = round(div * np.ceil(h_old / div))
     w_tgt = round(div * np.ceil(w_old / div))
     if mode == 'zero':
+        top, left = 0, 0
         padded = np.zeros([h_tgt, w_tgt, ch], dtype=im.dtype)
         padded[:h_old, :w_old, :] = im
     elif mode == 'replicate':
@@ -134,7 +136,7 @@ def pad_divisible(im: np.ndarray, div: int, mode='zero'):
                         mode='edge')
     else:
         raise ValueError()
-    return padded
+    return padded, (top, left)
 
 
 def crop_divisible(im: np.ndarray, div: int):
