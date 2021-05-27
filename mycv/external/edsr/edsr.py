@@ -85,9 +85,9 @@ class EDSR(nn.Module):
         x = torch.from_numpy(lr).float().permute(2,0,1).unsqueeze(0)
         x = x.to(device=device)
         y = self.forward(x)
-        hr = y.clamp_(min=0, max=255).round_().cpu().squeeze_(0).permute(1,2,0)
-        hr = hr.to(dtype=torch.uint8).numpy()
-        return hr
+        sr = y.clamp_(min=0, max=255).round_().cpu().squeeze_(0).permute(1,2,0)
+        sr = sr.to(dtype=torch.uint8).numpy()
+        return sr
 
 
 if __name__ == '__main__':
