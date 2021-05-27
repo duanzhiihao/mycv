@@ -44,13 +44,15 @@ def get_dir(dataset, scale):
 
 
 class SRDataset(torch.utils.data.Dataset):
-    def __init__(self, dataset, scale, lr_size=48, verbose=True):
+    def __init__(self, dataset, scale, lr_size=48, one_mean_std=(False,False,False),
+                 verbose=True):
         hr_dir, lr_dir = get_dir(dataset, scale)
         hr_names = os.listdir(hr_dir)
         self.hr_paths = [str(hr_dir / hname) for hname in hr_names]
         self.lr_paths = [str(lr_dir / hname.replace('.png', f'x{scale}.png')) \
                          for hname in hr_names]
         self.lr_size = lr_size
+        self.one_mean_std = one_mean_std
         if verbose:
             print('Checking LR images...')
             for lpath in tqdm(self.lr_paths):
@@ -58,12 +60,13 @@ class SRDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         assert len(self.hr_paths) == len(self.lr_paths)
-        return len(self.hr_paths)
+        return len(self.hr_paths) * 10
 
     def __getitem__(self, index):
         # load image
-        hrpath = self.hr_paths[index]
-        lrpath = self.lr_paths[index]
+        _idx = index % len(self.hr_paths)
+        hrpath = self.hr_paths[_idx]
+        lrpath = self.lr_paths[_idx]
         lr = cv2.cvtColor(cv2.imread(lrpath), cv2.COLOR_BGR2RGB)
         hr = cv2.cvtColor(cv2.imread(hrpath), cv2.COLOR_BGR2RGB)
         # random crop
@@ -72,6 +75,14 @@ class SRDataset(torch.utils.data.Dataset):
         # to tensor
         lr = torch.from_numpy(lr).permute(2, 0, 1).float()
         hr = torch.from_numpy(hr).permute(2, 0, 1).float()
+        # formatting
+        if self.one_mean_std[0]:
+            lr.div_(255)
+            hr.div_(255)
+        if self.one_mean_std[1]:
+            raise NotImplementedError()
+        if self.one_mean_std[2]:
+            raise NotImplementedError()
         return lr, hr
 
 
