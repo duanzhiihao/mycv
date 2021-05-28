@@ -91,7 +91,7 @@ class EDSR(nn.Module):
 
 if __name__ == '__main__':
     from mycv.paths import MYCV_DIR
-    scale = 4
+    scale = 2
     model = EDSR('baseline', scale=scale)
 
     wpath = MYCV_DIR / f'weights/edsr/edsr_baseline_x{scale}.pt'
@@ -106,21 +106,21 @@ if __name__ == '__main__':
     # lr = torch.zeros(1,3,5,5, device='cuda:0')
     # rec = model(lr)
     # model = model.cuda()
-    for ch in range(64):
-        latent = torch.zeros(1, 64, 16, 16, device='cuda:0')
-        latent[0, ch, 7, 7] = 1000
-        with torch.no_grad():
-            rec1 = model.tail(latent)
-            rec1 = model.add_mean(rec1)
-        latent[0, ch, 7, 7] = -1000
-        with torch.no_grad():
-            rec2 = model.tail(latent)
-            rec2 = model.add_mean(rec2)
-        rec = torch.cat([rec1, rec2], dim=3)
-        rec = rec.clamp_(min=0, max=255).round_().detach().cpu().squeeze_(0).permute(1,2,0)
-        rec = rec.to(dtype=torch.uint8).numpy()
-        plt.imshow(rec); plt.show()
-    exit()
+    # for ch in range(64):
+    #     latent = torch.zeros(1, 64, 16, 16, device='cuda:0')
+    #     latent[0, ch, 7, 7] = 1000
+    #     with torch.no_grad():
+    #         rec1 = model.tail(latent)
+    #         rec1 = model.add_mean(rec1)
+    #     latent[0, ch, 7, 7] = -1000
+    #     with torch.no_grad():
+    #         rec2 = model.tail(latent)
+    #         rec2 = model.add_mean(rec2)
+    #     rec = torch.cat([rec1, rec2], dim=3)
+    #     rec = rec.clamp_(min=0, max=255).round_().detach().cpu().squeeze_(0).permute(1,2,0)
+    #     rec = rec.to(dtype=torch.uint8).numpy()
+    #     plt.imshow(rec); plt.show()
+    # exit()
 
     # model = model.cuda()
     # from tqdm import tqdm
