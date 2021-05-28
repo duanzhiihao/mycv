@@ -122,7 +122,7 @@ def pad_divisible(im: np.ndarray, div: int, mode='zero'):
     """
     assert is_image(im, cv2_ok=True, pil_ok=False)
     h_old, w_old, ch = im.shape
-    if h_old % div == 0 and h_old % div == 0:
+    if h_old % div == 0 and w_old % div == 0:
         return im, (0,0)
     h_tgt = round(div * np.ceil(h_old / div))
     w_tgt = round(div * np.ceil(w_old / div))
