@@ -25,7 +25,7 @@ class EDSR(nn.Module):
         scale (int): 2, 3, or 4
         conv (optional): [description]. Defaults to common.default_conv.
     """
-    def __init__(self, version, scale, conv=common.default_conv):
+    def __init__(self, version, scale):
         super().__init__()
         if version == 'baseline':
             n_resblocks = 16
@@ -41,18 +41,16 @@ class EDSR(nn.Module):
         kernel_size = 3
         rgb_range = 255
  
-        act = nn.ReLU(inplace=True)
-        url_name = 'r{}f{}x{}'.format(n_resblocks, n_feats, scale)
-        if url_name in url:
-            self.url = url[url_name]
-        else:
-            self.url = None
-        self.sub_mean = common.MeanShift(rgb_range)
-        self.add_mean = common.MeanShift(rgb_range, sign=1)
+        # url_name = 'r{}f{}x{}'.format(n_resblocks, n_feats, scale)
+        # if url_name in url:
+        #     self.url = url[url_name]
+        # else:
+        #     self.url = None
 
+        act = nn.ReLU(inplace=True)
+        conv=common.default_conv
         # define head module
         m_head = [conv(n_colors, n_feats, kernel_size)]
-
         # define body module
         m_body = [
             common.ResBlock(
@@ -60,13 +58,14 @@ class EDSR(nn.Module):
             ) for _ in range(n_resblocks)
         ]
         m_body.append(conv(n_feats, n_feats, kernel_size))
-
         # define tail module
         m_tail = [
             common.Upsampler(conv, scale, n_feats, act=False),
             conv(n_feats, n_colors, kernel_size)
         ]
-
+        # register modules
+        self.sub_mean = common.MeanShift(rgb_range)
+        self.add_mean = common.MeanShift(rgb_range, sign=1)
         self.head = nn.Sequential(*m_head)
         self.body = nn.Sequential(*m_body)
         self.tail = nn.Sequential(*m_tail)
