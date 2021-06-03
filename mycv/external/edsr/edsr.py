@@ -40,12 +40,6 @@ class EDSR(nn.Module):
         n_colors = 3
         kernel_size = 3
         rgb_range = 255
- 
-        # url_name = 'r{}f{}x{}'.format(n_resblocks, n_feats, scale)
-        # if url_name in url:
-        #     self.url = url[url_name]
-        # else:
-        #     self.url = None
 
         act = nn.ReLU(inplace=True)
         conv=common.default_conv
@@ -64,11 +58,15 @@ class EDSR(nn.Module):
             conv(n_feats, n_colors, kernel_size)
         ]
         # register modules
-        self.sub_mean = common.MeanShift(rgb_range)
-        self.add_mean = common.MeanShift(rgb_range, sign=1)
+        self.init_mean_shift(rgb_range)
         self.head = nn.Sequential(*m_head)
         self.body = nn.Sequential(*m_body)
         self.tail = nn.Sequential(*m_tail)
+
+    def init_mean_shift(self, rgb_range):
+        self.rgb_range = rgb_range
+        self.sub_mean = common.MeanShift(rgb_range)
+        self.add_mean = common.MeanShift(rgb_range, sign=1)
 
     def forward(self, x):
         x = self.sub_mean(x)
@@ -82,8 +80,16 @@ class EDSR(nn.Module):
     def sr_numpy(self, lr):
         device = self.sub_mean.bias.device
         x = torch.from_numpy(lr).float().permute(2,0,1).unsqueeze(0)
+        if self.rgb_range == 1:
+            x.div_(255.0)
+        else:
+            assert self.rgb_range == 255
         x = x.to(device=device)
         y = self.forward(x)
+        if self.rgb_range == 1:
+            y.mul_(255.0)
+        else:
+            assert self.rgb_range == 255
         sr = y.clamp_(min=0, max=255).round_().cpu().squeeze_(0).permute(1,2,0)
         sr = sr.to(dtype=torch.uint8).numpy()
         return sr
