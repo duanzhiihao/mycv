@@ -49,16 +49,6 @@ def _get_imgpaths(datasets: list, verbose=True):
         for imname in img_names:
             impath = str(img_dir / imname)
             img_paths.append(impath)
-    if 'NIC' in datasets:
-        if verbose:
-            print('Loading NIC training set...')
-        NIC_DIR = 'D:/Datasets/NIC/train'
-        for s in ['Animal', 'Building', 'Mountain', 'Street']:
-            img_dir = NIC_DIR + '/' + s
-            img_names = os.listdir(img_dir)
-            for imname in img_names:
-                impath = img_dir + '/' + imname
-                img_paths.append(impath)
     if 'imagenet200' in datasets:
         if verbose:
             print('Loading imagenet mini200 dataset...')
@@ -130,11 +120,11 @@ def _imread(img_path):
     im = cv2.imread(img_path)
     im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
 
-    input_ = imgUtils.pad_divisible(im, div=64)
+    input_, (pt,pl) = imgUtils.pad_divisible(im, div=64, mode='replicate')
     input_ = torch.from_numpy(input_).permute(2, 0, 1).float() / 255.0 # C,H,W
     # 0~1, float32, RGB, HWC
     input_: torch.Tensor
-    return input_, im
+    return input_, im, (pt,pl)
 
 
 def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, dataset='kodak'):
@@ -163,6 +153,9 @@ def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, dataset
     elif dataset == 'cityscapes':
         from mycv.paths import CITYSCAPES_DIR
         img_dir = CITYSCAPES_DIR / 'leftImg8bit/val'
+    elif dataset == 'div2k_val':
+        from mycv.paths import DIV2K_DIR
+        img_dir = DIV2K_DIR / 'val_hr'
     else:
         img_dir = dataset
     img_paths = [str(p) for p in img_dir.glob('**/*.*')]
@@ -174,7 +167,7 @@ def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, dataset
     pbar = tqdm(img_paths) if verbose else img_paths
     for bi, impath in enumerate(pbar):
         # load image
-        input_, im = _imread(impath)
+        input_, im, (pt,pl) = _imread(impath)
         imh, imw = im.shape[:2]
         # debugging
         # if True:
@@ -198,8 +191,8 @@ def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, dataset
         assert fake.shape == input_.shape and fake.dtype == input_.dtype
 
         # MS-SSIM
-        fake = fake[:, :, :imh, :imw] # 0~1, float32
-        real = input_[:, :, :imh, :imw]
+        fake = fake[:, :, pt:pt+imh, pl:pl+imw] # 0~1, float32
+        real = input_[:, :, pt:pt+imh, pl:pl+imw]
         ms = msssim_func(fake, real).item()
         # PSNR
         fake = fake.cpu().squeeze_(0).permute(1, 2, 0)

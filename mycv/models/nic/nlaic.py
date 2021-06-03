@@ -240,7 +240,7 @@ if __name__ == "__main__":
     # load_partial(model.context, MYCV_DIR / 'weights/nlaic/mse3200p.pkl')
     # torch.save(model.state_dict(), MYCV_DIR / 'weights/nlaic/nlaic_mse3200.pt')
     # exit()
-    load_partial(model, MYCV_DIR / 'weights/nlaic/nlaic_mse3200.pt')
+    load_partial(model, MYCV_DIR / 'weights/nlaic/nlaic_mse6400.pt')
     # load_partial(model, MYCV_DIR / 'weights/nlaic/nlaic_mse200_2.pt')
     model.eval()
 
@@ -259,10 +259,11 @@ if __name__ == "__main__":
     # from tqdm import tqdm
     # for _ in tqdm(range(1024)):
     #     latent = torch.randn(1, 192, 32, 32, device='cuda:0') * 20
-    #     rec = model.decoder(latent)
+    #     with torch.no_grad():
+    #         rec = model.decoder(latent)
     #     assert rec.shape == (1, 3, 512, 512)
 
     from mycv.datasets.imcoding import nic_evaluate
     # results = nic_evaluate(model, input_norm=False, dataset='kodak')
-    results = nic_evaluate(model, input_norm=False, dataset='kodak')
+    results = nic_evaluate(model, input_norm=False, dataset='div2k_val')
     print(results)

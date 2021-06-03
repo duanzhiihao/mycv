@@ -139,6 +139,8 @@ def sr_evaluate(model, dataset, scale, verbose=True):
         scale (int): super resolution factor
         verbose (bool, optional): Defaults to True.
     """
+    model.eval()
+
     hr_dir, lr_dir = get_dir(dataset, scale)
     hr_names = os.listdir(hr_dir)
     hr_names.sort()
