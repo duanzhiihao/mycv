@@ -33,7 +33,7 @@ class Check(Dataset):
             im = tvf.to_tensor(img)
             assert im.shape == (3, h, w), f'{im.shape} {impath}'
         else:
-            raise ValueError('level should be in 0,1')
+            raise ValueError('level should be in 0,1,2')
         return 0
 
 def check_images(img_paths, workers=4, check_level=0):
