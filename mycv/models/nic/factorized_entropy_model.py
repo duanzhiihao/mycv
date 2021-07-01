@@ -38,59 +38,31 @@ class Entropy_bottleneck(nn.Module):
         if not 0 < self.tail_mass < 1:
             raise ValueError(
                 "`tail_mass` must be between 0 and 1")
-        filters = (1,) + self.filters + (1,)
+        filters = (1,) + self.filters + (1,) # (1, 3, 3, 3, 1)
         scale = self.init_scale ** (1.0 / (len(self.filters) + 1))
         self._matrices = nn.ParameterList([])
         self._bias = nn.ParameterList([])
         self._factor = nn.ParameterList([])
         # print ('scale:',scale)
-        for i in range(len(self.filters) + 1):
+        for i in range(len(self.filters) + 1): # i = 0, 1, 2, 3
+            matrix = Parameter(torch.FloatTensor(channel, filters[i + 1], filters[i]))
+            # matrix: (nC,3,1), (nC,3,3), (nC,3,3), (nC,1,3)
             init = np.log(np.expm1(1.0 / scale / filters[i + 1]))
+            matrix.data.fill_(init)
+            self._matrices.append(matrix)
 
-            self.matrix = Parameter(torch.FloatTensor(channel, filters[i + 1], filters[i]))
-
-            self.matrix.data.fill_(init)
-
-            self._matrices.append(self.matrix)
-
-            self.bias = Parameter(torch.FloatTensor(channel, filters[i + 1], 1))
-
-            noise = np.random.uniform(-0.5, 0.5, self.bias.size())
+            bias = Parameter(torch.FloatTensor(channel, filters[i + 1], 1))
+            # bias: (nC,3,1), (nC,3,1), (nC,3,1), (nC,1,1)
+            noise = np.random.uniform(-0.5, 0.5, bias.size())
             noise = torch.FloatTensor(noise)
-            self.bias.data.copy_(noise)
-            self._bias.append(self.bias)
+            bias.data.copy_(noise)
+            self._bias.append(bias)
 
             if i < len(self.filters):
-                self.factor = Parameter(torch.FloatTensor(channel, filters[i + 1], 1))
-
-                self.factor.data.fill_(0.0)
-
-                self._factor.append(self.factor)
-
-    def _logits_cumulative(self, logits, stop_gradient):
-        # logits: (nC, nB, nH*nW)
-        for i in range(len(self.filters) + 1): # 0, 1, 2, 3
-            matrix = f.softplus(self._matrices[i])
-            if stop_gradient:
-                matrix = matrix.detach()
-            logits = torch.matmul(matrix, logits)
-
-            bias = self._bias[i]
-            if stop_gradient:
-                bias = bias.detach()
-            logits += bias
-
-            if i < len(self._factor):
-                factor = torch.tanh(self._factor[i])
-                if stop_gradient:
-                    factor = factor.detach()
-                logits += factor * torch.tanh(logits)
-        return logits
-
-    def add_noise(self, x):
-        noise = np.random.uniform(-0.5, 0.5, x.size())
-        noise = torch.Tensor(noise).cuda()
-        return x + noise
+                factor = Parameter(torch.FloatTensor(channel, filters[i + 1], 1))
+                # factor: (nC,3,1), (nC,3,1), (nC,3,1), (nC,1,1)
+                factor.data.fill_(0.0)
+                self._factor.append(factor)
 
     def forward(self, x):
         # x: (nB, nC, nH, nW)
@@ -98,7 +70,7 @@ class Entropy_bottleneck(nn.Module):
         # x: (nC, nB, nH, nW)
         shape = x.size()
         x = x.view(shape[0],1,-1)
-        # x: (nC, nB, nH*nW)
+        # x: (nC, 1, nB*nH*nW)
         if self.training:
             x = _UniverseQuant.apply(x)
         else:
@@ -118,6 +90,32 @@ class Entropy_bottleneck(nn.Module):
         x = x.view(shape)
         x = x.permute(1, 0, 2, 3)
         return x, likelihood
+
+    def _logits_cumulative(self, logits, stop_gradient):
+        # logits: (nC, 1, nB*nH*nW)
+        for i in range(len(self.filters) + 1): # i = 0, 1, 2, 3
+            matrix = f.softplus(self._matrices[i])
+            if stop_gradient:
+                matrix = matrix.detach()
+            logits = torch.matmul(matrix, logits) # (nC, 3, 1) matmul (nC, 1, nB*nH*nW)
+            # logits: # (nC, 3, nB*nH*nW)
+
+            bias = self._bias[i]
+            if stop_gradient:
+                bias = bias.detach()
+            logits += bias
+
+            if i < len(self._factor):
+                factor = torch.tanh(self._factor[i])
+                if stop_gradient:
+                    factor = factor.detach()
+                logits += factor * torch.tanh(logits)
+        return logits
+
+    def add_noise(self, x):
+        noise = np.random.uniform(-0.5, 0.5, x.size())
+        noise = torch.Tensor(noise).cuda()
+        return x + noise
 
 
 class _UniverseQuant(torch.autograd.Function):
