@@ -199,14 +199,14 @@ class Hyper_Dec(nn.Module):
 
 
 if __name__ == "__main__":
-    from mycv.paths import WEIGHTS_DIR
+    from mycv.paths import MYCV_DIR
     from mycv.utils.torch_utils import num_params
-    model = MiniNIC(enable_bpp=True)
-    # model.load_state_dict(torch.load(WEIGHTS_DIR/'miniMSE.pt')['model'])
+    model = MiniNIC(enable_bpp=False)
+    model.load_state_dict(torch.load(MYCV_DIR / 'weights/miniMSE.pt')['model'])
     # checkpoint = torch.load('C:/Projects/yolov5/runs/nic/mini9_v1/weights/last.pt')
     model.eval()
     model = model.cuda()
 
-    from mycv.datasets.loadimgs import kodak_val
+    from mycv.datasets.imcoding import kodak_val
     results = kodak_val(model, input_norm=False)
     print(results)
