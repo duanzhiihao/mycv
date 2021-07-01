@@ -62,6 +62,9 @@ class Distribution_for_entropy2(nn.Module):
         scale0[scale0 == 0] = 1e-6
         scale1[scale1 == 0] = 1e-6
         scale2[scale2 == 0] = 1e-6
+        scale0 = torch.abs(scale0)
+        scale1 = torch.abs(scale1)
+        scale2 = torch.abs(scale1)
         # 3 gaussian distribution
         m0 = torch.distributions.normal.Normal(mean0, scale0)
         m1 = torch.distributions.normal.Normal(mean1, scale1)
