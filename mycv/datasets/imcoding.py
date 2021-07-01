@@ -23,12 +23,18 @@ def _get_imgpaths(datasets: list, verbose=True):
         if verbose:
             print('Loading COCO train2017 dataset...')
         from mycv.paths import COCO_DIR
-        ann_path = COCO_DIR / 'annotations/images_train2017.json'
-        assert ann_path.exists(), f'{ann_path} does not exist'
-        images = json.load(open(ann_path, 'r'))['images']
-        for imgInfo in images:
-            impath = str(COCO_DIR / 'train2017' / imgInfo['file_name'])
+        img_dir = COCO_DIR / 'train2017'
+        assert img_dir.exists()
+        img_names = os.listdir(img_dir)
+        for imname in img_names:
+            impath = str(img_dir / imname)
             img_paths.append(impath)
+        # ann_path = COCO_DIR / 'annotations/images_train2017.json'
+        # assert ann_path.exists(), f'{ann_path} does not exist'
+        # images = json.load(open(ann_path, 'r'))['images']
+        # for imgInfo in images:
+        #     impath = str(COCO_DIR / 'train2017' / imgInfo['file_name'])
+        #     img_paths.append(impath)
     if 'CLIC' in datasets:
         raise DeprecationWarning()
         if verbose:
@@ -67,7 +73,7 @@ def _get_imgpaths(datasets: list, verbose=True):
 class LoadImages(torch.utils.data.Dataset):
     """ Image loading dataset for image coding
     """
-    def __init__(self, datasets=['COCO','CLIC'], img_size=256, input_norm=False,
+    def __init__(self, datasets=['COCO','CLIC400'], img_size=256, input_norm=False,
                  verbose=True):
         assert isinstance(img_size, int)
         self.img_paths = _get_imgpaths(datasets, verbose)
@@ -88,17 +94,19 @@ class LoadImages(torch.utils.data.Dataset):
 
         # data augmentation
         if min(im.shape[:2]) < self.img_size:
-            im = imgUtils.scale(im, size=self.img_size, side='shorter')
+            im = imgUtils.scale(im, size=self.img_size, shorter=True)
         assert min(im.shape[:2]) >= self.img_size, f'{impath}, {im.shape}'
         im = augUtils.random_crop(im, crop_hw=(self.img_size,self.img_size))
         im = self._random_aug(im) # random augmentation
         assert imgUtils.is_image(im)
+        assert im.shape == (self.img_size, self.img_size, 3)
 
         # to tensor
         im = torch.from_numpy(im).permute(2, 0, 1).float() / 255.0
+        assert (0 <= im.min()) and (im.max() <= 1)
         if self._input_norm:
             # normalize such that mean = 0 and std = 1
-            im = im.sub_(ImageNetCls.input_mean).div_(ImageNetCls.input_std)
+            im = im.sub_(self.input_mean).div_(self.input_std)
 
         assert im.shape == (3, self.img_size, self.img_size)
         return im
