@@ -212,7 +212,9 @@ def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, dataset
                 p1, p2 = probs['y'], probs['z']
             else:
                 p1, p2 = probs
-            bpp = cal_bpp(p1, imh*imw) + cal_bpp(p2, imh*imw)
+            bpp = cal_bpp(p1, imh*imw)
+            if p2 is not None:
+                bpp += cal_bpp(p2, imh*imw)
             bpp = bpp.item()
         else:
             bpp = -1024
@@ -255,7 +257,7 @@ if __name__ == "__main__":
     #         im = im.permute(1,2,0).numpy()
     #         plt.imshow(im); plt.show()
 
-    from mycv.models.nic.mini import MiniNIC
+    from mycv.models.nlaic.mini import MiniNIC
     from mycv.paths import MYCV_DIR
     model = MiniNIC(enable_bpp=True)
     checkpoint = torch.load(MYCV_DIR / 'runs/imcoding/mini_6/last.pt')
