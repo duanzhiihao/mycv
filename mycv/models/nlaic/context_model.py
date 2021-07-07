@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as f
 
-from mycv.models.nic.basic_module import conv2d, ResBlock
+from mycv.models.nlaic.basic_module import conv2d, ResBlock
 
 
 class MaskConv3d(nn.Conv3d):

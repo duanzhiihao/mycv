@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 
-from mycv.models.nic.basic_module import conv2d, ResBlock, Non_local_Block, UniverseQuant
-from mycv.models.nic.factorized_entropy_model import Entropy_bottleneck
-from mycv.models.nic.context_model import P_Model, Weighted_Gaussian
+from mycv.models.nlaic.basic_module import conv2d, ResBlock, Non_local_Block, UniverseQuant
+from mycv.models.nlaic.factorized_entropy_model import Entropy_bottleneck
+from mycv.models.nlaic.context_model import P_Model, Weighted_Gaussian
 
 
 class NLAIC(nn.Module):
