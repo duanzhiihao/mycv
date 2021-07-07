@@ -17,9 +17,10 @@ class SimpleGaussian(nn.Module):
         p1 = gaussian_cdf(self._mean, scale, x+0.5)
         p0 = gaussian_cdf(self._mean, scale, x-0.5)
         p = p1 - p0
+        p = p.clamp_(1e-6)
 
         _debug = p.detach()
-        assert 0 <= _debug.min() <= _debug.max() <= 1
+        assert 0 < _debug.min() <= _debug.max() <= 1
         return p
 
 
