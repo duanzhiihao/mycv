@@ -119,7 +119,7 @@ class Complex_context(nn.Module):
             *[Resblock_3D(48, 48, 1, 1, 0) for _ in range(nums[1])],
             nn.Conv3d(48, 2, 1, 1, 0)
         )
-        from mycv.models.nic.gaussian_entropy_model import Distribution_for_entropy2_old
+        from mycv.models.nlaic.gaussian_entropy_model import Distribution_for_entropy2_old
         self.gaussin_entropy_func = Distribution_for_entropy2_old()
 
     def forward(self, x, hyper):
@@ -157,7 +157,7 @@ class Weighted_Gaussian(nn.Module):
             nn.Conv3d(96, 9, 1, 1, 0)
         )
         self.conv3 = nn.Conv2d(M*2, M, 3, 1, 1)
-        from mycv.models.nic.gaussian_entropy_model import Distribution_for_entropy2
+        from mycv.models.nlaic.gaussian_entropy_model import Distribution_for_entropy2
         self.gaussin_entropy_func = Distribution_for_entropy2()
 
     def forward(self, x, hyper):

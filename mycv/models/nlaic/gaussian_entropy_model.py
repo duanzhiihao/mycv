@@ -59,12 +59,12 @@ class Distribution_for_entropy2(nn.Module):
         probs = torch.stack([prob0, prob1, prob2], dim=-1)
         probs = f.softmax(probs, dim=-1)
         # process the scale value to non-zero
-        scale0[scale0 == 0] = 1e-6
-        scale1[scale1 == 0] = 1e-6
-        scale2[scale2 == 0] = 1e-6
-        scale0 = torch.abs(scale0)
-        scale1 = torch.abs(scale1)
-        scale2 = torch.abs(scale1)
+        # scale0[scale0 == 0] = 1e-6
+        # scale1[scale1 == 0] = 1e-6
+        # scale2[scale2 == 0] = 1e-6
+        scale0 = scale0.abs().clamp(min=1e-6)
+        scale1 = scale1.abs().clamp(min=1e-6)
+        scale2 = scale2.abs().clamp(min=1e-6)
         # 3 gaussian distribution
         m0 = torch.distributions.normal.Normal(mean0, scale0)
         m1 = torch.distributions.normal.Normal(mean1, scale1)
