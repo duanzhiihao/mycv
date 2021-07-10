@@ -68,11 +68,11 @@ def imread_tensor(img_path: str, div=16, color='RGB'):
         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
     else:
         assert color.upper == 'BGR'
-    im = pad_divisible(im, div=div)
+    im, (pad_top, pad_left) = pad_divisible(im, div=div)
     im = torch.from_numpy(im).permute(2, 0, 1).float() / 255.0 # C,H,W
     # 0~1, float32, RGB, HWC
     im: torch.Tensor
-    return im
+    return im, (pad_top, pad_left)
 
 
 def to_tensor(im: np.ndarray):

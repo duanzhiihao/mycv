@@ -40,6 +40,12 @@ def model_profile(model: nn.Module, input):
 
 
 def summary_weights(state_dict: OrderedDict, save_path='model.txt'):
+    """ Summary the weights name and shape to a text file at save_path
+
+    Args:
+        state_dict (OrderedDict): model state dict
+        save_path (str, optional): output save path. Defaults to 'model.txt'.
+    """
     if not isinstance(state_dict, OrderedDict):
         print('Warning: state_dict is not a OrderedDict. keys may not be ordered.')
     if Path(save_path).exists():
