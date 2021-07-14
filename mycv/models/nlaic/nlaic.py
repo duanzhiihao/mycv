@@ -46,7 +46,7 @@ class NLAIC(nn.Module):
             xp3 = self.context(xq, hyper_dec) # 2GB
             return rec, (xp2, xp3)
         else:
-            return rec, None
+            return rec, (None, None)
 
     def encode(self, x):
         '''
