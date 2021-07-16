@@ -192,8 +192,9 @@ def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, dataset
             output = forward_nic(input_)
             if isinstance(output, dict):
                 fake, probs = output['x_hat'], output['likelihoods']
+                p1, p2 = (probs['y'], probs['z']) if probs is not None else (None, None)
             else:
-                fake, probs = output
+                fake, (p1, p2) = output
         fake: torch.Tensor # should be between 0~1
         fake = fake.clamp_(min=0, max=1)
         assert fake.shape == input_.shape and fake.dtype == input_.dtype
@@ -207,17 +208,9 @@ def nic_evaluate(model: torch.nn.Module, input_norm=False, verbose=True, dataset
         fake = fake.mul_(255).round_().to(dtype=torch.uint8).numpy()
         ps = imgUtils.psnr_dB(im, fake)
         # Bpp
-        if probs is not None:
-            if isinstance(probs, dict):
-                p1, p2 = probs['y'], probs['z']
-            else:
-                p1, p2 = probs
-            bpp = cal_bpp(p1, imh*imw)
-            if p2 is not None:
-                bpp += cal_bpp(p2, imh*imw)
-            bpp = bpp.item()
-        else:
-            bpp = -1024
+        bpp1 = cal_bpp(p1, imh*imw) if p1 is not None else 0
+        bpp2 = cal_bpp(p2, imh*imw) if p2 is not None else 0
+        bpp = float(bpp1 + bpp2)
         # if True: # debugging
         #     import matplotlib.pyplot as plt
         #     plt.figure(); plt.imshow(im)
