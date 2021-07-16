@@ -114,9 +114,9 @@ class ImageNetCls(torch.utils.data.Dataset):
         return pairs
 
 
-def imagenet_val(model: torch.nn.Module, split='val', testloader=None,
-                 img_size=None, batch_size=None, workers=None, input_norm=None):
-    """ Imagenet validation
+def imagenet_val(model: torch.nn.Module, testloader=None,
+                 split=None, img_size=None, batch_size=None, workers=None, input_norm=None):
+    """ Imagenet validation. Either specify testloader, or specify other arguments
 
     Args:
         model (torch.nn.Module): pytorch model
@@ -128,20 +128,23 @@ def imagenet_val(model: torch.nn.Module, split='val', testloader=None,
             workers (int)
             input_norm (bool)
     """
-    assert split.startswith('val')
-    model.eval()
-    device = next(model.parameters()).device
-    forward_ = getattr(model, 'forward_cls', model.forward)
-
     # test set
     if testloader is None:
-        assert all([v is not None for v in (img_size, batch_size, workers, input_norm)])
+        assert all([v is not None for v in (split, img_size, batch_size, workers, input_norm)])
+        assert split.startswith('val')
         testset = ImageNetCls(split=split, img_size=img_size, input_norm=input_norm)
         testloader = torch.utils.data.DataLoader(
             testset, batch_size=batch_size, shuffle=False, num_workers=workers,
             pin_memory=True, drop_last=False
         )
+    else:
+        assert all([v is None for v in (split, img_size, batch_size, workers, input_norm)])
+    split = testloader.dataset.split
     nC = testloader.dataset.num_class
+
+    model.eval()
+    device = next(model.parameters()).device
+    forward_ = getattr(model, 'forward_cls', model.forward)
 
     predictions = []
     top1_tpsum, top5_tpsum, _num = 0, 0, 0
