@@ -1,6 +1,7 @@
 from pathlib import Path
 from copy import deepcopy
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
+import itertools
 import math
 import random
 import numpy as np
@@ -90,18 +91,66 @@ def load_partial(model, weights, verbose=True):
               f'overlap & loaded: {len(new_dic)} layers')
 
 
-def load_partial_optimizer(optimizer, state, verbose=True):
-    raise NotImplementedError()
-    groups = self.param_groups
-    saved_groups = state_dict['param_groups']
-    # idmap = 
-    debug = 1
+def optimizer_named_states(optimizer: torch.optim.Optimizer, named_params):
+    """ save optimizer state dict with named states
+
+    Args:
+        optimizer (torch.optim.Optimizer): pytorch optimizer
+        named_params: the return of model.named_parameters()
+    """
+    param_to_name = {v:k for k,v in named_params}
+    named_states = dict()
+    for i, (p, pstate) in enumerate(optimizer.state.items()):
+        if p not in param_to_name:
+            raise ValueError(f'Optimizer parameter {i}, {p.shape} not in model')
+        pname = param_to_name[p]
+        named_states[pname] = pstate
+    return {
+        'state': named_states,
+        'param_groups': None,
+    }
 
 
-# def rename_weights(weights, old, new, verbose=True):
-#     from mycv.utils.general import warning
-#     warning('rename_weights() is Deprecated. Use weights_replace() instead.')
-#     return weights_replace(weights, old, new, verbose)
+def optimizer_load_partial(optimizer: torch.optim.Optimizer, named_params,
+                           state_dict: dict, verbose=True):
+    """ load optimizer state dict
+
+    Args:
+        optimizer (torch.optim.Optimizer): pytorch optimizer
+        named_params: the return of model.named_parameters()
+        state_dict (dict): saved state dict
+        verbose (bool, optional): print info or not. Defaults to True.
+    """
+    param_to_name = {v:k for k,v in named_params}
+    saved_named_states = state_dict['state']
+    new_state = defaultdict(dict)
+    count = 0
+
+    # iterate through all parameters in the optimizer.param_groups
+    parameters = [pg['params'] for pg in optimizer.param_groups]
+    parameters = list(itertools.chain.from_iterable(parameters))
+    for p in parameters:
+        # parameter in optimizer should also be in the model
+        if p not in param_to_name:
+            raise ValueError(f'Optimizer parameter {i}, {p.shape} not in model')
+        pname = param_to_name[p]
+        if pname in saved_named_states: # if saved, load the state of it
+            new_state[p] = saved_named_states[pname]
+            count += 1
+    # check other states
+    cur_states = optimizer.state
+    for p in cur_states:
+        pname = param_to_name[p]
+        if pname not in saved_named_states:
+            new_state[p] = cur_states[p]
+
+    if verbose:
+        print(f'{type(optimizer).__name__}:',
+              f'{len(parameters)} parameters, {len(cur_states)} states,',
+              f'saved: {len(saved_named_states)} states,',
+              f'overlap & loaded: {len(new_state)} states')
+
+    optimizer.__setstate__({'state': new_state})
 
 
 def weights_replace(weights, old, new, verbose=True):
