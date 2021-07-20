@@ -3,7 +3,10 @@ from setuptools import setup, find_packages
 
 if __name__ == '__main__':
     packages = find_packages(
-        exclude=('*deprecated*', '*scripts*', '*unittest*'),
+        exclude=(
+            'deprecated', 'deprecated.*', 'scripts', 'scripts.*',
+            'unittest', 'unittest.*'
+        ),
         include=('mycv')
     )
 
