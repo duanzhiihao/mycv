@@ -4,10 +4,11 @@ A personal computer vision repository using pytorch
 ## Installation
 0. Clone repository
 1. Rename "mycv/paths.txt" to "mycv/paths.py", and update the paths in it accordingly.
-2. `conda develop --name env_name /path/to/mycv`
+2. In the terminal, `cd /xxx/xxx/mycv`
+3. `pip install -e .`
 
 ## Uninstall
-`conda develop --uninstall /path/to/mycv`
+`pip uninstall mycv`
 
 ## Imagenet experiments
 Notes:
